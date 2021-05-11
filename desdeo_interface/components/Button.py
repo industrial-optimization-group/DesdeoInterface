@@ -12,14 +12,13 @@ class Button:
         Exception: digital pin doesn't exist on the arduino uno or is reserved for system
     """
     pin: Pin
-    prev_value: bool
-    delay_time_ms: float = 150 #milliseconds, Minimun delay between clicks, to avoid accidental clicks 
+    prev_value: bool = False
+    #debounce_time_ms: float = 50 #milliseconds, Minimun delay between clicks, to avoid unwanted clicks
 
     def __init__(self, board: Board, pin: int):
         if pin < 2 or pin > 13:
             raise Exception("Pin is invalid, should be in the range of 2-15")
         self.pin = board.get_pin(f'd:{pin}:i')
-        self.delay_time_s = self.delay_time_ms / 1000
 
     # Todo function as parameter if needed, callback idea
     def click(self) -> bool:
@@ -32,30 +31,48 @@ class Button:
 
         clicked = self.pin.read() == 1
 
-        if clicked:
-            time.sleep(self.delay_time_s)
+        if not clicked and self.prev_value:
+            self.prev_value = False
+            return False
+
+        if clicked and not self.prev_value: #not self.prev_value should take care of accidental "holds" *double confirmations, and debouncing
+            self.prev_value = clicked
             return True
+        
         return False
 
-    # todo
-    def double_click(self, max_time_between_clicks_ms: float = 750) -> bool:
+    def double_click(self, max_time_between_clicks_ms: float = 250) -> bool:
+        """
+        is the button clicked twice in a short period a.k.a double clicked
+        Args:
+            max_time_between_clicks_ms (float): Maximum time between the clicks in milliseconds, defaults to 250ms
+        Returns:
+            bool: whether or not the button is double clicked 
+        """
+        first_click = self.click()
+        if not first_click: return False
+        start_time = time.time()
+        while (start_time + (max_time_between_clicks_ms / 1000) > time.time()): # this will freeze the execution of other program for max_time_between_clicks every time it is called :(
+            second_click = self.click() #Can't be holding down, because prev_value takes care of it
+            if second_click: return True
         return False
 
-
+ 
     def hold(self, hold_time_ms: float = 1000):
         """
         is the button being held down
-        args: 
-        hold_time_s (float): how long should the button be held down
+        Args: 
+            hold_time_s (float): how long should the button be held down
         Returns:
             bool: whether or not the button is being held down
         """
-        holding = self.click()
-        time_holding_ms = self.delay_time_ms
-        while (holding):
-            if (time_holding_ms >= hold_time_ms): return True 
-            holding = self.click()
-            time_holding_ms += self.delay_time_ms #I dont think this is very efficient or accurate, but it gets the job kinda done
+        holding = self.click() # prev value = True
+        hold_time_s = hold_time_ms / 1000
+        start_time = time.time()
+        while (self.prev_value): # Prev value will be false if button has been released
+            #print(f"time left: {start_time + hold_time_s - time.time()}", end='\r') # Trying out, seems to work
+            if (start_time + hold_time_s <= time.time()): return True # Button has been held for desired hold time
+            holding = self.click() # if button is released then prev value = False
         return False
 
 
@@ -68,11 +85,31 @@ if __name__ == "__main__":
     it = util.Iterator(board)
     it.start()
     button = Button(board, pin)
-    print("Press the button to continue")
+    print("Click the button to continue")
     while not button.click():
         pass
     print("Button clicked!")
-    print("hold the button")
-    while not button.hold():
+
+    print("Click the button again to continue")
+    while not button.click():
         pass
-    print("Button was held")
+    print("Button clicked!")
+
+    times = 5
+    print(f"Click the button {times} times to continue")
+    for i in range(times):
+        print(f"{times - i} left")
+        while not button.click():
+            pass
+    print(f"Button clicked {times} times")
+
+    print("Double click the button")
+    while not button.double_click():
+        pass
+    print("Button double clicked!")
+
+    hold_time = 1500
+    print(f"hold the button for {hold_time / 1000} seconds")
+    while not button.hold(hold_time):
+        pass
+    print("\nButton was held")
