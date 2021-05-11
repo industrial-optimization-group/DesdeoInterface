@@ -12,6 +12,7 @@ class Button:
         Exception: digital pin doesn't exist on the arduino uno or is reserved for system
     """
     pin: Pin
+    prev_value: bool
     delay_time_ms: float = 150 #milliseconds, Minimun delay between clicks, to avoid accidental clicks 
 
     def __init__(self, board: Board, pin: int):
