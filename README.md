@@ -5,8 +5,8 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
 ## Todo
 * add .gitignore
 * fix imports
-* button refining
-    * functioning methods >:)
+* <s>button refining</s>
+* Test button in interface methods, especially double click delays
 * Rotary encoder module
 * Less noise with potentiometers
 * Documentation and commenting standards
