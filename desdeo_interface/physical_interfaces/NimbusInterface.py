@@ -1,14 +1,82 @@
-from desdeo_mcdm import interactive
+from Interface import Interface
+from Button import Button
+from Potentiometer import Potentiometer
+from time import sleep
 import numpy as np
+from typing import Union, Optional, List, Tuple
 
-import matplotlib.pyplot as plt
-from desdeo_problem.Problem import MOProblem
-from desdeo_problem.Variable import variable_builder
-from desdeo_problem.Objective import _ScalarObjective
+class NimbusInterface(Interface):
+    """
+    A interface class for the Nimbus method
+    Args:
+        port (str): The serial port Arduino is connected
+        button_pins (Union[np.array, List[int]]): digital pins that are connected to buttons
+        potentiometer_pins (Union[np.array, List[int]]): analog pins that are connected to potentiometers
+        variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
+    """
+
+    def __init__(
+        self,
+        port: str,
+        button_pins: Union[np.array, List[int]],
+        potentiometer_pins: Union[np.array, List[int]],
+        variable_bounds: Optional[np.ndarray],
+    ):
+        super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
+    
+    #fix, bounds
+    def get_aspiration_level(self) -> float:
+        print(f"Specify an aspiration level for the objective")
+        return self.get_potentiometer_value()
+    
+    #fix, bounds
+    def get_upper_bound(self) -> float:
+        print(f"Specify a upper bound for the objective")
+        return self.get_potentiometer_value()
+    
+    def get_classification(self, options: Union[List[str], np.ndarray]) -> str:
+        return self.choose_from(options, index_max=len(options) - 1)[1]
+    
+    def get_classifications_and_levels(self, amount) -> Tuple[List[str], List[float]]:
+        classification_options = ["<", "<=", "=", ">=", "0"]
+        classifications = []
+        levels = []
+        for obj_value in range(amount):
+            print(f"Pick a classification level for objective at index {obj_value}")
+            classification = self.get_classification(classification_options)
+            if classification == "<=":
+                level = self.get_aspiration_level()
+            elif classification == ">=":
+                level = self.get_upper_bound()
+            else:
+                level = -1
+            levels.append(level)
+            classifications.append(classification)
+            print(f"Current classifications and levels: {classifications} {levels}")
+        return classifications, levels
+    
+    def specify_solution_count(self):
+        return 0
+    
+    def pick_preferred_solution(self):
+        return 0
+    
+    def should_continue(self):
+        return 0
+
+    def try_another_classification(self):
+        return 0
+    
+    def show_different_alternatives(self):
+        return 0
+
 
 if __name__ == "__main__":
-    from physical_interfaces import NimbusInterface
-
+    import matplotlib.pyplot as plt
+    from desdeo_problem.Problem import MOProblem
+    from desdeo_problem.Variable import variable_builder
+    from desdeo_problem.Objective import _ScalarObjective
+    
     def f_1(xs: np.ndarray):
         xs = np.atleast_2d(xs)
         xs_plusone = np.roll(xs, 1, axis=1)

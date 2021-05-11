@@ -1,16 +1,87 @@
-
-
+from Interface import Interface
+from Button import Button
+from Potentiometer import Potentiometer
+from time import sleep
 import numpy as np
+from typing import Union, Optional, List, Tuple
 
-from desdeo_problem.Variable import variable_builder
-from desdeo_problem.Objective import VectorObjective, _ScalarObjective
-from desdeo_problem.Problem import MOProblem
 
-from desdeo_mcdm.interactive import Nautilus
 
-from physical_interfaces import NautilusInterface
+class NautilusInterface(Interface):
+    """
+    A interface class for the Nautilus method
+    Args:
+        port (str): The serial port Arduino is connected
+        button_pins (Union[np.array, List[int]]): digital pins that are connected to buttons
+        potentiometer_pins (Union[np.array, List[int]]): analog pins that are connected to potentiometers
+        variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
+    Raises:
+        InterfaceException: Has less than three buttons.
+    """
 
+    it_count: int = 3 #Iteration count, default is 3
+    preference: np.ndarray
+
+    def __init__(
+        self,
+        port: str,
+        button_pins: Union[np.array, List[int]],
+        potentiometer_pins: Union[np.array, List[int]],
+        variable_bounds: Optional[np.ndarray],
+    ):
+        super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
+
+        if len(button_pins) < 3:
+            raise Exception("Nautilus interface requires atleast three buttons")
+    
+    def get_iteration_count(self) -> int:
+        print("\nSet a new iteration count")
+        return self.choose_from(index_min = 1, index_start = 3)
+    
+    def step_back(self) -> bool:
+        return self.confirmation("\nDo you wish to step back? green yes, red no")
+    
+    def short_step(self) -> bool:
+        return self.confirmation("\nshort step? green yes, red no")
+    
+    def use_previous_preference(self):
+        return self.confirmation("\nDo you wish to use previous preference? green yes, red no")
+        
+    def get_preference_method(self): #Maybe to parent as select from
+        print("\nSelect the method: green = relative_ranking, red = percentages")
+        while True:
+            if self.buttons[0].click(): return 1
+            if self.buttons[1].click(): return 2
+    
+    def get_preference_info_relative_ranking(self):
+        print("\nUse the potentiometers to set relative rankings to the objectives, green to confirm")
+        bound_max = len(self.potentiometers)
+        return self.get_potentiometer_values_int("rankings", 1, bound_max)
+    
+    #fix
+    def get_preference_info_percentages(self):
+        print("\nUse the potentiometers to set percentages to the objectives, green to confirm")
+        used_percentage = 0
+        while not self.buttons[0].click():
+            for pot in self.potentiometers:
+                percentage = pot.get_value(0,100-used_percentage)
+                used_percentage += percentage
+                percentages = []
+                percentages.append(percentage)
+            self.print_over(f"Current percentages: {percentages}")
+        print("\n\n")
+        return percentages
+
+
+#Testing
 if __name__ == "__main__":
+    from desdeo_problem.Variable import variable_builder
+    from desdeo_problem.Objective import VectorObjective, _ScalarObjective
+    from desdeo_problem.Problem import MOProblem
+
+    from desdeo_mcdm.interactive import Nautilus
+
+    from desdeo_interface.physical_interfaces import interface
     # example problem from article
 
     def f1(xs):
@@ -130,83 +201,3 @@ if __name__ == "__main__":
         print("Lower bounds of objectives: ", req.content["lower_bounds"])
         print("Upper bounds of objectives:", req.content["upper_bounds"])
         print("Closeness to Pareto optimal front", req.content["distance"])
-    
-    """
-    req = method.iterate(req)
-    print("\nStep number: ", method._step_number)
-    print("Iteration point: ", req.content["current_iteration_point"])
-    print("Pareto optimal vector: ", method._fs[method._step_number])
-    print("Lower bounds of objectives: ", req.content["lower_bounds"])
-    # print("Upper bounds of objectives:", req.content["upper_bounds"])
-    print("Closeness to Pareto optimal front", req.content["distance"])
-
-    req.response = {
-        "step_back": False,
-        "short_step": False,
-        "use_previous_preference": True,
-    }
-
-    # 2 - take a step back and give new preferences
-    req = method.iterate(req)
-    print("\nStep number: ", method._step_number)
-    print("Iteration point: ", req.content["current_iteration_point"])
-    print("Pareto optimal vector: ", method._fs[method._step_number])
-    print("Lower bounds of objectives: ", req.content["lower_bounds"])
-    print("Closeness to Pareto optimal front", req.content["distance"])
-
-    req.response = {
-        "step_back": True,
-        "short_step": False,
-        "use_previous_preference": False,
-        "preference_method": 1,
-        "preference_info": np.array([2, 3, 1]),
-    }
-
-    # 3 - give new preferences
-    req = method.iterate(req)
-    print("\nStep number: ", method._step_number)
-    print("Iteration point: ", req.content["current_iteration_point"])
-    print("Pareto optimal vector: ", method._fs[method._step_number])
-    print("Lower bounds of objectives: ", req.content["lower_bounds"])
-    print("Closeness to Pareto optimal front", req.content["distance"])
-
-    req.response = {
-        "step_back": False,
-        "use_previous_preference": False,
-        "preference_method": 1,
-        "preference_info": np.array([1, 2, 1]),
-    }
-
-    # 4 - take a step back and provide new preferences
-    req = method.iterate(req)
-    print("\nStep number: ", method._step_number)
-    print("Iteration point: ", req.content["current_iteration_point"])
-    print("Pareto optimal vector: ", method._fs[method._step_number])
-    print("Lower bounds of objectives: ", req.content["lower_bounds"])
-    print("Closeness to Pareto optimal front", req.content["distance"])
-    """
-
-
-    """
-    req.response = {
-        "step_back": True,
-        "short_step": False,
-        "use_previous_preference": False,
-        "preference_method": 2,
-        "preference_info": np.array([30, 70]),
-    }
-    # 5. continue with the same preferences
-    while method._n_iterations_left > 1:
-        req = method.iterate(req)
-        print("\nStep number: ", method._step_number)
-        print("Iteration point: ", req.content["current_iteration_point"])
-        print("Pareto optimal vector: ", method._fs[method._step_number])
-        print("Lower bounds of objectives: ", req.content["lower_bounds"])
-        print("Closeness to Pareto optimal front", req.content["distance"])
-        req.response = {"step_back": False,
-                        "use_previous_preference": True
-                        }
-    print("\nEnd of solution process")
-    req = method.iterate(req)
-    print(req.content)
-    """

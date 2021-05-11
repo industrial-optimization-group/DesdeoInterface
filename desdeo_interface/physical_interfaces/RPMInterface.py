@@ -1,20 +1,70 @@
+#FIGURE OUT IMPORTS :D
+from Interface import Interface 
+from Button import Button
+from Potentiometer import Potentiometer
+from time import sleep
 import numpy as np
-from desdeo_mcdm.interactive.InteractiveMethod import InteractiveMethod
-from desdeo_problem.Objective import VectorObjective, _ScalarObjective
-from desdeo_problem.Problem import MOProblem
-from desdeo_problem.Variable import variable_builder
+from typing import Union, Optional, List
 
-from desdeo_mcdm.interactive import ReferencePointMethod
-from physical_interfaces import RPMInterface
-"""
-Reference Point Method (RPM)
-"""
+class RPMInterface(Interface):
+    """
+    A interface class for the reference point method
+    Args:
+        port (str): The serial port Arduino is connected
+        button_pins (Union[np.ndarray, List[int]]): digital pins that are connected to buttons
+        potentiometer_pins (Union[np.ndarray, List[int]]): analog pins that are connected to potentiometers
+        variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
+    """
+
+    def __init__(
+        self,
+        port: str,
+        button_pins: Union[np.array, List[int]],
+        potentiometer_pins: Union[np.ndarray, List[int]],
+        variable_bounds: Optional[np.ndarray],
+    ):
+        super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
 
 
+    def get_input(self) -> np.ndarray:
+        """
+        Get real time values from potentiometers and display them. Continue when the DM chooses to
+
+        Returns:
+            np.array: new reference point
+        """
+        return self.get_potentiometer_bounded_values("Reference point")
+
+    def get_satisfaction(self) -> bool:
+        return self.confirmation("\npress the green button if satisfied, else red")
+
+    # fix, double clicks and stuff
+    def pick_solution(self, solutions: np.ndarray) -> int:
+        """
+        Let the DM choose the desired solution from the different options
+
+        Args:
+            solutions [np.array]: pareto optimal solution and additional solutions
+
+        Returns:
+            int: Index of the desired solution
+        """
+        print(
+            """Choose a desired solution by scrolling through the options by clicking the red button
+        when ready press the green button"""
+        )
+
+        return self.choose_from(solutions, index_max = len(solutions) - 1)[0]
 
 
 # testing the method
 if __name__ == "__main__":
+    from desdeo_mcdm.interactive.InteractiveMethod import InteractiveMethod
+    from desdeo_problem.Objective import VectorObjective, _ScalarObjective
+    from desdeo_problem.Problem import MOProblem
+    from desdeo_problem.Variable import variable_builder
+
+    from desdeo_mcdm.interactive import ReferencePointMethod
     print("Reference point method")
 
     # Objectives
