@@ -13,7 +13,6 @@ class Potentiometer:
         Exception: analog pin doesn't exist on the arduino uno
     """
     pin: Pin
-    prev_value: bool
 
     def __init__(self, board: Board, pin: int):
         if pin < 0 or pin > 5:
