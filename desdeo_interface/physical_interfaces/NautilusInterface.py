@@ -80,8 +80,6 @@ if __name__ == "__main__":
     from desdeo_problem.Problem import MOProblem
 
     from desdeo_mcdm.interactive import Nautilus
-
-    from desdeo_interface.physical_interfaces import interface
     # example problem from article
 
     def f1(xs):
