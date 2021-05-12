@@ -1,11 +1,16 @@
-from Button import Button
-from Potentiometer import Potentiometer
+import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
+
+from desdeo_interface.components.Button import Button
+from desdeo_interface.components.Potentiometer import Potentiometer
 #I'd rather have this > from desdeo_interface.components.Button import Button > but its not working
 from pyfirmata import Arduino, util
 from time import sleep
 import numpy as np
 from typing import Union, Optional, List
-
+import os
+import sys
 class InterfaceException(Exception):
     """
     Raised when an exception related to an interface is encountered.

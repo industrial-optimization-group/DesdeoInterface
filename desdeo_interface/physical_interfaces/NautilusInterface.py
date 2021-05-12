@@ -1,9 +1,13 @@
-from Interface import Interface
-from Button import Button
-from Potentiometer import Potentiometer
+import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
+
+from desdeo_interface.physical_interfaces.Interface import Interface
+from desdeo_interface.components.Button import Button
+from desdeo_interface.components.Potentiometer import Potentiometer
 from time import sleep
 import numpy as np
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional, List
 
 
 
@@ -30,9 +34,6 @@ class NautilusInterface(Interface):
         variable_bounds: Optional[np.ndarray],
     ):
         super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
-
-        if len(button_pins) < 3:
-            raise Exception("Nautilus interface requires atleast three buttons")
     
     def get_iteration_count(self) -> int:
         print("\nSet a new iteration count")

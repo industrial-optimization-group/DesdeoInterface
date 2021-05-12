@@ -1,6 +1,10 @@
-from Interface import Interface
-from Button import Button
-from Potentiometer import Potentiometer
+import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
+
+from desdeo_interface.physical_interfaces.Interface import Interface
+from desdeo_interface.components.Button import Button
+from desdeo_interface.components.Potentiometer import Potentiometer
 from time import sleep
 import numpy as np
 from typing import Union, Optional, List, Tuple

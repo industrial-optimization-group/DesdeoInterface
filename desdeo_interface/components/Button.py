@@ -1,7 +1,13 @@
+import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
+
+from desdeo_interface.components.Component import Component
+
 from pyfirmata import Board, Pin
 import time
 
-class Button:
+class Button(Component):
     """
     A button class to handle input from a connected button
     Args:
@@ -11,14 +17,11 @@ class Button:
         #todo interface exceptions?
         Exception: digital pin doesn't exist on the arduino uno or is reserved for system
     """
-    pin: Pin
     prev_value: bool = False
     #debounce_time_ms: float = 50 #milliseconds, Minimun delay between clicks, to avoid unwanted clicks
 
     def __init__(self, board: Board, pin: int):
-        if pin < 2 or pin > 13:
-            raise Exception("Pin is invalid, should be in the range of 2-15")
-        self.pin = board.get_pin(f'd:{pin}:i')
+        super().__init__(board, pin, True)
 
     # Todo function as parameter if needed, callback idea
     def click(self) -> bool:
@@ -29,7 +32,7 @@ class Button:
         """
         time.sleep(0.01) #wont work without, because pin is unavailable and pyfirmata stalls or something
 
-        clicked = self.pin.read() == 1
+        clicked = self.get_pin_value() == 1
 
         if not clicked and self.prev_value:
             self.prev_value = False
@@ -66,13 +69,12 @@ class Button:
         Returns:
             bool: whether or not the button is being held down
         """
-        holding = self.click() # prev value = True
         hold_time_s = hold_time_ms / 1000
         start_time = time.time()
         while (self.prev_value): # Prev value will be false if button has been released
             #print(f"time left: {start_time + hold_time_s - time.time()}", end='\r') # Trying out, seems to work
             if (start_time + hold_time_s <= time.time()): return True # Button has been held for desired hold time
-            holding = self.click() # if button is released then prev value = False
+            self.click() # if button is released then prev value = False
         return False
 
 
