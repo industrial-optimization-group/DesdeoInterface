@@ -26,6 +26,6 @@ class Component:
         """
         Read the value of the pin assigned to the component
         Returns:
-            float | None: value of the pin which is between 0.0 - 1.0 or None if pin is unavailable
+            float: value of the pin which is between 0.0 - 1.0 or -1.0 if pin is unavailable
         """
-        return self.pin.read()
+        return self.pin.read() if self.pin.read() is not None else -1.0

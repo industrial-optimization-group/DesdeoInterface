@@ -5,6 +5,7 @@ sys.path.insert(1, p)
 from desdeo_interface.components.Component import Component
 
 from pyfirmata import Board
+import numpy as np
 
 class Potentiometer(Component):
     """
@@ -33,7 +34,7 @@ class Potentiometer(Component):
         """
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
-        value_pin = 0 if self.get_pin_value() is None else self.get_pin_value()
+        value_pin = self._get_mode_value()
         current_value = (value_pin * (max - min)) + min
         return round(current_value, 3) #Temporary rounding so that printing looks somewhat decent
 
@@ -41,12 +42,12 @@ class Potentiometer(Component):
     def get_value_int(self, min: int = 0, max: int = 1) -> int: #inclusive
         return round(self.get_value(min, max))
 
-    #FIX
-    #def get_mode_value(self, it: int):  # should this be in own modue
-    #    values = []
-    #    for _i in range(it):
-    #        values.append(self.get_value())
-    #    return mymath.mode(values)
+    #TODO test how it works when there are multiple pots, does it take long. Docs
+    def _get_mode_value(self, it: int = 10):
+        values = []
+        for i in range(it):
+            values.append(self.get_pin_value())
+        return max(values, key = values.count) # return the mean
 
 
 if __name__ == "__main__":
