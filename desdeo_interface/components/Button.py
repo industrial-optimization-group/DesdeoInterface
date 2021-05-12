@@ -21,7 +21,7 @@ class Button(Component):
     #debounce_time_ms: float = 50 #milliseconds, Minimun delay between clicks, to avoid unwanted clicks
 
     def __init__(self, board: Board, pin: int):
-        super().__init__(board, pin, True)
+        super().__init__(board, [pin], True)
 
     # Todo function as parameter if needed, callback idea
     def click(self) -> bool:
@@ -32,7 +32,7 @@ class Button(Component):
         """
         time.sleep(0.01) #wont work without, because pin is unavailable and pyfirmata stalls or something
 
-        clicked = self.get_pin_value() == 1
+        clicked = self.get_pin_values()[0] == 1
 
         if not clicked and self.prev_value:
             self.prev_value = False
@@ -71,8 +71,9 @@ class Button(Component):
         """
         hold_time_s = hold_time_ms / 1000
         start_time = time.time()
+        self.click()
         while (self.prev_value): # Prev value will be false if button has been released
-            #print(f"time left: {start_time + hold_time_s - time.time()}", end='\r') # Trying out, seems to work
+            print(f"time left: {start_time + hold_time_s - time.time()}", end='\r') # Trying out, seems to work
             if (start_time + hold_time_s <= time.time()): return True # Button has been held for desired hold time
             self.click() # if button is released then prev value = False
         return False

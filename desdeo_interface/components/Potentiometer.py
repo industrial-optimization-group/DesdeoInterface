@@ -5,7 +5,6 @@ sys.path.insert(1, p)
 from desdeo_interface.components.Component import Component
 
 from pyfirmata import Board
-import numpy as np
 
 class Potentiometer(Component):
     """
@@ -18,7 +17,7 @@ class Potentiometer(Component):
     """
 
     def __init__(self, board: Board, pin: int):
-        super().__init__(board, pin, False)
+        super().__init__(board, [pin], False)
 
     #todo int values, as arg and return? not needed?
     def get_value(self, min: float = 0, max: float = 1) -> float:
@@ -46,7 +45,8 @@ class Potentiometer(Component):
     def _get_mode_value(self, it: int = 10):
         values = []
         for i in range(it):
-            values.append(self.get_pin_value())
+            value = self.get_pin_values()[0]
+            values.append(value)
         return max(values, key = values.count) # return the mean
 
 
