@@ -1,9 +1,11 @@
+from desdeo_interface.components.RotaryEncoder import RotaryEncoder
 import os, sys
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
+from desdeo_interface.components.RotaryEncoder import RotaryEncoder
 #I'd rather have this > from desdeo_interface.components.Button import Button > but its not working
 from pyfirmata import Arduino, util
 from time import sleep
@@ -19,13 +21,16 @@ class InterfaceException(Exception):
     pass
 
 
+# Pins could be predetermined for components i.e digital pins from 2-4 are reserved for buttons, 5-11 for rotary encoders. analog 0-6 for potentiometers
+# This way it should be quite easy to check whether or not a button is connected to a pin or not
 class Interface:
     """
     A interface class to handle the Decision Maker's inputs given with a physical interface (Arduino)
     Args:
         port (str): The serial port Arduino is connected
-        button_pins (Union[np.array, List[int]]): digital pins that are connected to buttons
-        potentiometer_pins (Union[np.array, List[int]]): analog pins that are connected to potentiometers, count should be the same as variables
+        button_pins (Union[np.ndarray, List[int]]): digital pins that are connected to buttons
+        potentiometer_pins (Union[np.ndarray, List[int]]): analog pins that are connected to potentiometers, count should be the same as variables
+        rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
         variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
     Raises:
         InterfaceException: more variables than potentiometers, cant adjust each variable
@@ -37,6 +42,7 @@ class Interface:
     _it: util.Iterator
     buttons: list[Button]
     potentiometers: list[Potentiometer]
+    rotary_encoders: list[RotaryEncoder]
     variable_bounds: Optional[np.ndarray]
 
     def __init__(
@@ -44,14 +50,15 @@ class Interface:
         port: str,
         button_pins: Union[np.array, List[int]],
         potentiometer_pins: Union[np.array, List[int]],
+        rotary_encoders: Union[np.ndarray, List[List[int]]],
         variable_bounds: Optional[np.ndarray],
     ):
         if variable_bounds is not None:
-            if len(variable_bounds) > len(potentiometer_pins):
+            if len(variable_bounds) > len(potentiometer_pins): #This is kinda dumb if we also have rotary encoders or predetermined pins. FIX
                 raise InterfaceException(
                     "Not enough potentiometers!"
                 )
-        if len(button_pins) < 3: #One could use only one button, if the button has multiple interactions, hold, double click and so on. Two is easier and three very simple
+        if len(button_pins) < 3: #FIX if using predetermined pins. Check that atleast 3 buttons have been connected
             raise InterfaceException("A physical interface requires atleast three buttons")
 
         self._board = Arduino(port)

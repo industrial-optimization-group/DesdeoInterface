@@ -50,6 +50,7 @@ class Potentiometer(Component):
         return max(values, key = values.count) # return the mean
 
 
+# Simple testing for a potentiometer
 if __name__ == "__main__":
     from pyfirmata import Arduino, util
     import time

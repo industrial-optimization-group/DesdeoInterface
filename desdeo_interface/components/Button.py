@@ -4,7 +4,7 @@ sys.path.insert(1, p)
 
 from desdeo_interface.components.Component import Component
 
-from pyfirmata import Board, Pin
+from pyfirmata import Board
 import time
 
 class Button(Component):
@@ -46,7 +46,7 @@ class Button(Component):
 
     def double_click(self, max_time_between_clicks_ms: float = 250) -> bool:
         """
-        is the button clicked twice in a short period a.k.a double clicked
+        is the button clicked twice in a short period a.k.a double click
         Args:
             max_time_between_clicks_ms (float): Maximum time between the clicks in milliseconds, defaults to 250ms
         Returns:
@@ -79,7 +79,7 @@ class Button(Component):
         return False
 
 
-# Todo some tests, currently simple test for button
+# Simple testing for a button
 if __name__ == "__main__":
     from pyfirmata import Arduino, util
     port = "COM3"  # Serial port the board is connected to
