@@ -11,8 +11,7 @@ from pyfirmata import Arduino, util
 from time import sleep
 import numpy as np
 from typing import Union, Optional, List
-import os
-import sys
+
 class InterfaceException(Exception):
     """
     Raised when an exception related to an interface is encountered.
@@ -21,8 +20,10 @@ class InterfaceException(Exception):
     pass
 
 
-# Pins could be predetermined for components i.e digital pins from 2-4 are reserved for buttons, 5-11 for rotary encoders. analog 0-6 for potentiometers
-# This way it should be quite easy to check whether or not a button is connected to a pin or not
+# Each component will have it's own microcontroller
+# First component to be connected to pc will be the "master" which is actually connected to the pc by usb or some other way, other components will be connected to this "master" by wires\bt\wifi etc
+# I guess the master will act as an "interface" which handles scaling, exceptions and so on
+# When I'll have a second microcontroller I'll try this connecting and modify the interface accordingly 
 class Interface:
     """
     A interface class to handle the Decision Maker's inputs given with a physical interface (Arduino)
@@ -45,21 +46,22 @@ class Interface:
     rotary_encoders: list[RotaryEncoder]
     variable_bounds: Optional[np.ndarray]
 
+    #Todo default values
     def __init__(
         self,
         port: str,
-        button_pins: Union[np.array, List[int]],
-        potentiometer_pins: Union[np.array, List[int]],
-        rotary_encoders: Union[np.ndarray, List[List[int]]],
-        variable_bounds: Optional[np.ndarray],
+        button_pins: Union[np.array, List[int]] = [],
+        potentiometer_pins: Union[np.array, List[int]] = [],
+        #rotary_encoders: Union[np.ndarray, List[List[int]]] = [],
+        variable_bounds: Optional[np.ndarray] = [],
     ):
         if variable_bounds is not None:
             if len(variable_bounds) > len(potentiometer_pins): #This is kinda dumb if we also have rotary encoders or predetermined pins. FIX
                 raise InterfaceException(
                     "Not enough potentiometers!"
                 )
-        if len(button_pins) < 3: #FIX if using predetermined pins. Check that atleast 3 buttons have been connected
-            raise InterfaceException("A physical interface requires atleast three buttons")
+        if len(button_pins) < 3: #FIX if using predetermined pins. Check that at least 3 buttons have been connected
+            raise InterfaceException("A physical interface requires at least three buttons")
 
         self._board = Arduino(port)
         self._it = util.Iterator(self._board)

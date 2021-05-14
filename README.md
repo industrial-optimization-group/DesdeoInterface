@@ -3,7 +3,7 @@
 The arduino is loaded with standard firmata: found from arduino ide -> file -> examples -> firmata -> standard firmata
 
 ## Todo
-* add .gitignore
+* remove stupid files aka pycache
 * fix imports
 * <s>button refining</s>
 * Test button in interface methods, especially double click delays
