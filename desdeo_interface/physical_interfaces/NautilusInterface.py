@@ -18,6 +18,7 @@ class NautilusInterface(Interface):
         port (str): The serial port Arduino is connected
         button_pins (Union[np.array, List[int]]): digital pins that are connected to buttons
         potentiometer_pins (Union[np.array, List[int]]): analog pins that are connected to potentiometers
+        rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
         variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
     Raises:
         InterfaceException: Has less than three buttons.
@@ -29,11 +30,12 @@ class NautilusInterface(Interface):
     def __init__(
         self,
         port: str,
-        button_pins: Union[np.array, List[int]],
-        potentiometer_pins: Union[np.array, List[int]],
-        variable_bounds: Optional[np.ndarray],
+        button_pins: Union[np.array, List[int]] = [],
+        potentiometer_pins: Union[np.array, List[int]] = [],
+        rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
+        variable_bounds: Optional[np.ndarray] = [],
     ):
-        super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
+        super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
     
     def get_iteration_count(self) -> int:
         print("\nSet a new iteration count")
@@ -133,7 +135,7 @@ if __name__ == "__main__":
 
 
     # Interface
-    interface = NautilusInterface("COM3", [2,3,4], [0,1,2], np.column_stack((ideal, nadir)))
+    interface = NautilusInterface("COM3", button_pins = [2,3,4], potentiometer_pins= [0,1,2], variable_bounds= np.column_stack((ideal, nadir)))
 
     # start solving
     method = Nautilus(problem=prob, ideal=ideal, nadir=nadir)

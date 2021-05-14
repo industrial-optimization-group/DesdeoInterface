@@ -6,7 +6,8 @@ sys.path.insert(1, p)
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
 from desdeo_interface.components.RotaryEncoder import RotaryEncoder
-#I'd rather have this > from desdeo_interface.components.Button import Button > but its not working
+from desdeo_interface.components.Component import Component
+
 from pyfirmata import Arduino, util
 from time import sleep
 import numpy as np
@@ -24,6 +25,9 @@ class InterfaceException(Exception):
 # First component to be connected to pc will be the "master" which is actually connected to the pc by usb or some other way, other components will be connected to this "master" by wires\bt\wifi etc
 # I guess the master will act as an "interface" which handles scaling, exceptions and so on
 # When I'll have a second microcontroller I'll try this connecting and modify the interface accordingly 
+
+# Modifications for the future:
+# A component could initialize the interface and others could then connect to it
 class Interface:
     """
     A interface class to handle the Decision Maker's inputs given with a physical interface (Arduino)
@@ -33,6 +37,9 @@ class Interface:
         potentiometer_pins (Union[np.ndarray, List[int]]): analog pins that are connected to potentiometers, count should be the same as variables
         rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
         variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
+    Attributes:
+        _board (pyfirmata.Board): The microcontroller (arduino) board
+        _it (pyfirmata.Iterator): Iterator which updates pin values
     Raises:
         InterfaceException: more variables than potentiometers, cant adjust each variable
         InterfaceException: Has less than two buttons.
@@ -52,15 +59,15 @@ class Interface:
         port: str,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
-        #rotary_encoders: Union[np.ndarray, List[List[int]]] = [],
+        rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
         variable_bounds: Optional[np.ndarray] = [],
     ):
         if variable_bounds is not None:
-            if len(variable_bounds) > len(potentiometer_pins): #This is kinda dumb if we also have rotary encoders or predetermined pins. FIX
+            if len(variable_bounds) > len(potentiometer_pins) + len(rotary_encoders_pins): # TODO move to validation when migrating to "texas"-model
                 raise InterfaceException(
                     "Not enough potentiometers!"
                 )
-        if len(button_pins) < 3: #FIX if using predetermined pins. Check that at least 3 buttons have been connected
+        if len(button_pins) < 3:
             raise InterfaceException("A physical interface requires at least three buttons")
 
         self._board = Arduino(port)
@@ -71,9 +78,11 @@ class Interface:
         self.potentiometers = list(
             map(lambda pin: Potentiometer(self._board, pin), potentiometer_pins)
         )
+        self.rotary_encoders = list(map(lambda pins: RotaryEncoder(self._board, pins), rotary_encoders_pins))
+
         if variable_bounds is not None:
             self.variable_bounds = variable_bounds
-            self.potentiometers = self.potentiometers[:len(variable_bounds)] #Cut off unneeded potentiometers
+            self.potentiometers = self.potentiometers[:len(variable_bounds)] # Cut off unneeded potentiometers
         else:
             k = len(potentiometer_pins)
             self.variable_bounds = np.column_stack((np.zeros(k), np.ones(k)))
@@ -132,7 +141,7 @@ class Interface:
         """
         Display real time values from the pots to terminal and return the values when a button is pressed
         Args:
-            value_name (str): Name of values. This will be printed to console and won't be neseccary later on
+            value_name (str): Name of values. This will be printed to console and won't be necessary later on
             value_min (float): min bound for all values
             value_max (float): max bound for all values
         Returns:
@@ -170,3 +179,13 @@ class Interface:
             if self.buttons[0].click(): break
         print("\n\n")
         return np.array(values)
+
+    # TODO
+    # Connect a component to the interface
+    def component_connect(self, component: Component):
+        return
+    
+    # TODO 
+    # Check if the interface has all required components
+    def validate_interface(self):
+        return

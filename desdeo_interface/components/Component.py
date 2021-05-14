@@ -2,9 +2,9 @@ from pyfirmata import Board, Pin
 
 class Component:
     """
-    A base class for components, maybe this was a bad idea as now this is basically pin class from pyfiramta and some components
+    A base class for components, maybe this was a bad idea as now this is basically pin class from pyfirmata and some components
     Args:
-        board (pyfirmata.pyfirmata.Board): The board (Arduino) the component is connected
+        board (pyfirmata.Board): The board (Arduino) the component is connected
         pins list[int]: The pins the component is connected to
     Raises:
         Exception: a pin doesn't exist on the arduino uno

@@ -6,11 +6,12 @@ from desdeo_interface.components.Component import Component
 
 from pyfirmata import Board
 
+# TIP It helps with the noise a little if you add a capacitor to the pots
 class Potentiometer(Component):
     """
     A potentiometer class to handle input from a connected potentiometer
     Args:
-        board (pyfirmata.pyfirmata.Board): The board (Arduino) the potentiometer is connected
+        board (pyfirmata.Board): The board (Arduino) the potentiometer is connected
         pin (int): The analog pin the potentiometer is connected to
     Raises:
         Exception: analog pin doesn't exist on the arduino uno
@@ -33,9 +34,10 @@ class Potentiometer(Component):
         """
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
-        value_pin = self._get_mode_value()
+        #value_pin = self._get_mode_value()
+        value_pin = self.get_pin_values()[0]
         current_value = (value_pin * (max - min)) + min
-        return round(current_value, 3) #Temporary rounding so that printing looks somewhat decent
+        return round(current_value,3) #Temporary rounding so that printing looks somewhat decent
 
     #TODO documentation
     def get_value_int(self, min: int = 0, max: int = 1) -> int: #inclusive

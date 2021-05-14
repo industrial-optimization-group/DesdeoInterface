@@ -16,7 +16,7 @@ class RotaryEncoder(Component):
         if len(pins) != 2:
             raise Exception("Rotary encoder needs 2 digital pins")
         super().__init__(board, pins, True)
-        self.state_prev = self.get_pin_values[0] # Inital state
+        self.state_prev = self.get_pin_values[0] # Initial state
         self.current_value = 0
     
     # TODO Make it so that movements when not asked are not accounted for

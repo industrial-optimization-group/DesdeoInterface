@@ -1,4 +1,6 @@
 import os, sys
+
+from numpy.core.fromnumeric import var
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 
@@ -16,17 +18,19 @@ class RPMInterface(Interface):
         port (str): The serial port Arduino is connected
         button_pins (Union[np.ndarray, List[int]]): digital pins that are connected to buttons
         potentiometer_pins (Union[np.ndarray, List[int]]): analog pins that are connected to potentiometers
+        rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
         variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
     """
 
     def __init__(
         self,
         port: str,
-        button_pins: Union[np.array, List[int]],
-        potentiometer_pins: Union[np.ndarray, List[int]],
-        variable_bounds: Optional[np.ndarray],
+        button_pins: Union[np.array, List[int]] = [],
+        potentiometer_pins: Union[np.array, List[int]] = [],
+        rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
+        variable_bounds: Optional[np.ndarray] = [],
     ):
-        super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
+        super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
 
 
     def get_input(self) -> np.ndarray:
@@ -122,7 +126,7 @@ if __name__ == "__main__":
     nadir = np.array([-4.751, -2.86054116, -0.32111111])
 
     # interface
-    interface = RPMInterface("COM3", [2,3,4], [0,1,2], np.column_stack((ideal, nadir)))
+    interface = RPMInterface("COM3", button_pins=[2,3,4], potentiometer_pins= [0,1,2], variable_bounds= np.column_stack((ideal, nadir)))
 
     # start solving
     method = ReferencePointMethod(problem=prob, ideal=ideal, nadir=nadir)
@@ -141,7 +145,6 @@ if __name__ == "__main__":
 
     print(f"Step number: {method._h} \n")
 
-    # 1 - continue with same preferences
     req = method.iterate(req)
     step = 1
     print("\nStep number: ", method._h)
@@ -152,7 +155,7 @@ if __name__ == "__main__":
     satisfied = interface.get_satisfaction()
     while not satisfied:
         step += 1
-        rp = rp = interface.get_input() #Instead let me choose the next rp
+        rp = rp = interface.get_input()
         req.response = {"reference_point": rp, "satisfied": False}
         req = method.iterate(req)
         print("\nStep number: ", method._h)

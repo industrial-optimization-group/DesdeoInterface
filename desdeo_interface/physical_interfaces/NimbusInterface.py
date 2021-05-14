@@ -1,4 +1,6 @@
 import os, sys
+
+from numpy.core.fromnumeric import var
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 
@@ -16,17 +18,19 @@ class NimbusInterface(Interface):
         port (str): The serial port Arduino is connected
         button_pins (Union[np.array, List[int]]): digital pins that are connected to buttons
         potentiometer_pins (Union[np.array, List[int]]): analog pins that are connected to potentiometers
+        rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
         variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
     """
 
     def __init__(
         self,
         port: str,
-        button_pins: Union[np.array, List[int]],
-        potentiometer_pins: Union[np.array, List[int]],
-        variable_bounds: Optional[np.ndarray],
+        button_pins: Union[np.array, List[int]] = [],
+        potentiometer_pins: Union[np.array, List[int]] = [],
+        rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
+        variable_bounds: Optional[np.ndarray] = [],
     ):
-        super().__init__(port, button_pins, potentiometer_pins, variable_bounds)
+        super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
     
     #fix, bounds
     def get_aspiration_level(self) -> float:
@@ -105,7 +109,7 @@ if __name__ == "__main__":
     ideal=np.array([-20, -12])
 
     problem = MOProblem(variables=varsl, objectives=[f1, f2], ideal=ideal, nadir=nadir)
-    interface = NimbusInterface("COM3", [2,3,4], [0,1,2], np.column_stack((nadir, ideal)))
+    interface = NimbusInterface("COM3", button_pins=[2,3,4], potentiometer_pins=[0,1,2], variable_bounds= np.column_stack((nadir, ideal)))
 
 
     from desdeo_mcdm.utilities.solvers import solve_pareto_front_representation
