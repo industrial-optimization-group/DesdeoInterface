@@ -1,4 +1,3 @@
-from desdeo_interface.components.RotaryEncoder import RotaryEncoder
 import os, sys
 p = os.path.abspath('.')
 sys.path.insert(1, p)
@@ -60,7 +59,7 @@ class Interface:
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = [],
+        variable_bounds: Optional[np.ndarray] = None,
     ):
         if variable_bounds is not None:
             if len(variable_bounds) > len(potentiometer_pins) + len(rotary_encoders_pins): # TODO move to validation when migrating to "texas"-model
@@ -90,7 +89,7 @@ class Interface:
     def print_over(self, to_print: str) -> None:
         print(to_print, end="\r")
     
-    def confirmation(self, to_print: str = "") -> bool:
+    def confirmation(self, to_print: str = None) -> bool:
         """
         wait for the DM to confirm or decline with a button press
         Args:
@@ -98,12 +97,12 @@ class Interface:
         Returns:
             bool: true in confirmed, false if declined
         """
-        if to_print: print(to_print)
+        if to_print is not None: print(to_print)
         while True:
             if self.buttons[0].click(): return True
             if self.buttons[1].click(): return False
     
-    def choose_from(self, options: np.ndarray, index_start: int = 0) -> Tuple(int, object):
+    def choose_from(self, options: np.ndarray, index_start: int = 0) -> Tuple[int, object]:
         """
         Let the dm choose an option from a given list by scrolling through different options with buttons
         Args:
@@ -114,6 +113,9 @@ class Interface:
         Returns:
             (int, object): A tuple of the index of the option and the option from the array
         """
+        if len(options) <= 0: 
+            raise Exception("No options to choose from")
+
         index_max = len(options) - 1
         if (index_start < 0 or index_start > index_max):
             raise Exception("Starting index out of bounds")
@@ -132,6 +134,33 @@ class Interface:
 
         print()
         return current, options[current]
+    
+    # in desdeo_emo/docs/notebooks/Example.ipynb one can choose multiple preferred values
+    def choose_multiple(self, options: np.ndarray, min_options: int = 1, max_options: int = None) -> np.ndarray:
+        if max_options is None:
+            max_options = len(options) # One can choose every option from the list
+        if max_options > len(options):
+            raise Exception("Can't choose more options than available")
+        
+        selected_options = []
+        options_temp = options
+        while (True):
+            option = self.choose_from(options_temp)
+            options_temp = np.delete(options_temp, option[0]) # Delete the option from the array so it won't be picked again
+            selected_options.append(option)
+            too_much = len(selected_options) >= max_options
+            not_enough = len(selected_options) < min_options
+            print(f"Current selection: {selected_options}")
+            if too_much:
+                print("Maximun options chosen")
+                break
+            if not_enough: # Don't ask for confirmation until min value reached
+                continue
+            if not self.confirmation("If you wish to pick another solution click the green button, if not red"):
+                break
+        return selected_options
+        
+
     
     def choose_from_range(self, index_min: float = 0, index_max: float = 100, index_start: float = None, step: float = 1) -> float:
         """
@@ -184,7 +213,7 @@ class Interface:
         return current
 
     def get_potentiometer_value(self, value_name: str = "value", value_min: float = 0, value_max: float = 1, pot_index = 0) -> float:
-        if pot_index  >= len(self.potentiometers):
+        if pot_index >= len(self.potentiometers) or pot_index < 0:
             raise InterfaceException("invalid pot index")
         print("\nPress the green button when you're ready")
         while True:
@@ -246,3 +275,17 @@ class Interface:
     # Check if the interface has all required components
     def validate_interface(self):
         return
+
+# TODO mooooooore
+if __name__ == "__main__":
+    interface = Interface("COM3", button_pins=[2,3,4], potentiometer_pins = [0,1,2])
+
+    t = np.array([1,2,3,4,5,6,7])
+    print(f"Select at least 2 values but no more than 4 from this array: {t}")
+    t_chosen = interface.choose_multiple(t, 2, 4)
+    print(f"You chose these values: {t_chosen}")
+
+    print("Choose a value between from 0-1500")
+    v = interface.get_potentiometer_value(value_min=0, value_max=1500)
+    
+
