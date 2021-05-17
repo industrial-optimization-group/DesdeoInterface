@@ -17,8 +17,11 @@ class Potentiometer(Component):
         Exception: analog pin doesn't exist on the arduino uno
     """
 
+    prev_value: float
+
     def __init__(self, board: Board, pin: int):
         super().__init__(board, [pin], False)
+        self.prev_value = self.get_pin_values()[0]
 
     #todo int values, as arg and return? not needed?
     def get_value(self, min: float = 0, max: float = 1) -> float:
@@ -34,10 +37,12 @@ class Potentiometer(Component):
         """
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
-        #value_pin = self._get_mode_value()
+        #value_pin = self._get_mode_value() # Option 1
         value_pin = self.get_pin_values()[0]
+        #if (abs(self.prev_value - value_pin) < 0.05): # Option 2
+        #   value_pin = self.prev_value
         current_value = (value_pin * (max - min)) + min
-        return round(current_value,3) #Temporary rounding so that printing looks somewhat decent
+        return round(current_value,3) # Temporary rounding so that printing looks somewhat decent
 
     #TODO documentation
     def get_value_int(self, min: int = 0, max: int = 1) -> int: #inclusive
