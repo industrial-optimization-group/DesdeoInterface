@@ -11,7 +11,7 @@ from desdeo_interface.components.Component import Component
 from pyfirmata import Arduino, util
 from time import sleep
 import numpy as np
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Tuple
 
 class InterfaceException(Exception):
     """
@@ -95,7 +95,6 @@ class Interface:
         wait for the DM to confirm or decline with a button press
         Args:
             to_print (str): Guide text to print
-
         Returns:
             bool: true in confirmed, false if declined
         """
@@ -104,27 +103,85 @@ class Interface:
             if self.buttons[0].click(): return True
             if self.buttons[1].click(): return False
     
-    #fix, if has options then max should prob be the count of elements - 1
-    def choose_from(self, options: np.ndarray = None, index_min = 0, index_max = 100, index_start = 0): # -> ??? element of the array or the index, could be many things
-        print('\nNavigate through different options: red +1, yellow -1, green confirm')
+    def choose_from(self, options: np.ndarray, index_start: int = 0) -> Tuple(int, object):
+        """
+        Let the dm choose an option from a given list by scrolling through different options with buttons
+        Args:
+            options (str): The list of chooseable options
+            index_start (int): The starting index of the search
+        Raises:
+            Exception: index_start is not a valid starting index. It is not between 0 and len(options) - 1
+        Returns:
+            (int, object): A tuple of the index of the option and the option from the array
+        """
+        index_max = len(options) - 1
+        if (index_start < 0 or index_start > index_max):
+            raise Exception("Starting index out of bounds")
+
+        print('\nChoose a desired option: red +1, yellow -1, green confirm')
         current = index_start
-        if options is None: 
-            self.print_over(f"Currently chosen {current}")
-        else:
-            self.print_over(f"Currently chosen {current}: {options[current]}")
+        self.print_over(f"Currently chosen {current}: {options[current]}")
         while not self.buttons[0].click():
             if self.buttons[1].click():
-                current = current +1 if current < index_max else index_min
+                current = current +1 if current < index_max else 0
             elif self.buttons[2].click():
-                current = current -1 if current > index_min else index_max
-            else: continue
+                current = current -1 if current > 0 else index_max
+            else: continue # Print only if either of the buttons have been clicked
 
-            if options is None:
-                self.print_over(f"Currently chosen {current}")
-            else:
-                self.print_over(f"Currently chosen {current}: {options[current]}")
+            self.print_over(f"Currently chosen {current}: {options[current]}")
+
         print()
-        return current if options is None else (current, options[current])
+        return current, options[current]
+    
+    def choose_from_range(self, index_min: float = 0, index_max: float = 100, index_start: float = None, step: float = 1) -> float:
+        """
+        Let the dm choose an number from a given range 
+        Args:
+            index_min (float): Smallest selectable value, defaults to 0
+            index_max (float): Highest selectable value, defaults to 100
+            index_start (float): The starting value, defaults to index_min
+            step (float): the size of each step, defaults to 1
+        Raises:
+            Exception: index_min is not lower than index_max
+            Exception: index_start is not a valid starting index. It is not between index_min and index_max
+            Exception: step size is not valid
+            Exception: starting index combined with step size is not valid
+        Returns:
+            float: the value chosen
+        """
+        if (index_min >= index_max):
+            raise Exception("index_min is not lower than index_max")
+        
+        if (index_start is None):
+            index_start = index_min
+
+        if (index_start < index_min or index_start > index_max):
+            raise Exception("Starting index out of bounds")
+        
+        if (step <= 0):
+            raise Exception("Step size must a positive number greater than zero")
+
+        if ((index_max - index_min) % step != 0):
+            raise Exception("Step size is invalid, won't reach min or max values")
+        
+        if ((index_max - index_start) % step != 0):
+            raise Exception("Won't reach min or max values with selected starting value and step size")
+
+        print('\nChoose a desired option: red +1, yellow -1, green confirm')
+        current = index_start
+        self.print_over(f"Currently chosen {current}")
+
+        while not self.buttons[0].click():
+            if self.buttons[1].click():
+                current = current +step if current < index_max else index_min
+            elif self.buttons[2].click():
+                current = current -step if current > index_min else index_max
+            else: continue # Print only if either of the buttons have been clicked
+
+            self.print_over(f"Currently chosen {current}")
+
+        print()
+        return current
 
     def get_potentiometer_value(self, value_name: str = "value", value_min: float = 0, value_max: float = 1, pot_index = 0) -> float:
         if pot_index  >= len(self.potentiometers):

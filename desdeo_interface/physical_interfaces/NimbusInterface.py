@@ -261,12 +261,7 @@ if __name__ == "__main__":
 
     preferred_request.response = response
 
-    print("hello") #Nuis
-    print(preferred_request) #Object
-
     stop_request, plot_request = method.iterate(preferred_request)
-
-    print(stop_request) #Object
 
     print(f"Final decision variables: {stop_request.content['solution']}")
 
