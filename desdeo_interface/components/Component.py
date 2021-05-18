@@ -1,12 +1,14 @@
 from pyfirmata import Board, Pin
 from typing import List
+
+import pyfirmata
 class Component:
     """
     A base class for component
 
     Args:
         board (pyfirmata.Board): The board (Arduino) the component is connected
-        pins list[int]: The pins the component is connected to
+        pins List[int]: The pins the component is connected to
 
     Raises:
         Exception: a pin doesn't exist on the arduino uno
@@ -24,7 +26,8 @@ class Component:
                 raise Exception("Pin is invalid, should be in the range on 0-5")
             self.pins = list(map(lambda pin: board.get_pin(f'a:{pin}:i'), pins))
     
-    def _validate_pins(self, pins: List[int], min: int, max: int) -> bool:
+    @staticmethod
+    def _validate_pins(pins: List[int], min: int, max: int) -> bool:
         """
         Checks if all the pins in the list are between min and max both are inclusive
         Example:

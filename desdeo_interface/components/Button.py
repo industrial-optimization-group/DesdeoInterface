@@ -28,7 +28,6 @@ class Button(Component):
         Exception: digital pin doesn't exist on the arduino uno or is reserved for system
     """
     prev_value: bool = False
-    #debounce_time_ms: float = 50 #milliseconds, Minimun delay between clicks, to avoid unwanted clicks
 
     def __init__(self, board: Board, pin: int):
         super().__init__(board, [pin], True)
@@ -88,7 +87,7 @@ class Button(Component):
             self.click() # if button is released then prev value = False
         return False
     
-    # Maybe
+    # Seems good! The delay for a click isn't that bad with these default values
     def action(self, hold_time_ms = 1000, max_time_between_clicks_ms = 250) -> Action:
         hold_time_s = hold_time_ms / 1000
         max_time_between_clicks_s = max_time_between_clicks_ms / 1000
@@ -117,9 +116,22 @@ if __name__ == "__main__":
     it.start()
     button = Button(board, pin)
     # Testing action
-    clicks_b2b = 0
-    while clicks_b2b <= 10: # If 10 clicks back to back quit
-        print(button.action())
+    double_clicks_b2b = 0
+    while double_clicks_b2b < 3: # If 3 double clicks back to back quit
+        action = button.action()
+        if action != Action.NO_ACTION:
+            print(action)
+            if action == Action.DOUBLE_CLICK: double_clicks_b2b += 1
+            else: double_clicks_b2b = 0
+    
+    action = Action.NO_ACTION
+    while action != Action.HOLD:
+        action = button.action()
+        if action == Action.CLICK: 
+            print("Clicking!")
+        elif action == Action.DOUBLE_CLICK:
+            print("Double clicking")
+
 
     # Testing basic methods
     # print("Click the button to continue")

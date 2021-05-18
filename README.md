@@ -23,7 +23,8 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
     * clean up duplicates
     * readability
     * handlers, encapsulate
-    * @property and @etc
+    * @property and other decorations
+
 
 ## Next meeting
 * Semimodular design idea
@@ -34,4 +35,5 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
     * The user could define the problem and then start the interface with the problem and the interface could take care of rest
     * i.e check nimbusinterface or RPMinterface
 * Connecting microcontrollers (components) to master and sending the data from slaves to python might be difficult
+    * How will each microcontroller know what component it is? Like a button or a rotary encoder?
     * Slave sends to master -> master sends to python

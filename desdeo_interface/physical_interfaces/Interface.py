@@ -21,12 +21,13 @@ class InterfaceException(Exception):
 
 
 # Each component will have it's own microcontroller
-# First component to be connected to pc will be the "master" which is actually connected to the pc by usb or some other way, other components will be connected to this "master" by wires\bt\wifi etc
+# First component to be connected to pc will be the "master" which is actually connected to the pc by usb or some other way, other components will be connected to this "master" by wires\bt\wifi\radio etc
 # I guess the master will act as an "interface" which handles scaling, exceptions and so on
 # When I'll have a second microcontroller I'll try this connecting and modify the interface accordingly 
 
 # Modifications for the future:
 # A component could initialize the interface and others could then connect to it
+# Or a default master component
 class Interface:
     """
     A interface class to handle the Decision Maker's inputs given with a physical interface (Arduino)
@@ -59,7 +60,7 @@ class Interface:
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = None, # [k][0] ideal, [k][1] nadir
+        variable_bounds: Optional[np.ndarray] = None, # [k][0] ideal_k, [k][1] nadir_k
     ):
         if variable_bounds is not None:
             if len(variable_bounds) > len(potentiometer_pins) + len(rotary_encoders_pins): # TODO move to validation when migrating to "texas"-model
@@ -73,18 +74,19 @@ class Interface:
         self._it = util.Iterator(self._board)
         self._it.start()
 
+        # Map the pins to actual components
         self.buttons = list(map(lambda pin: Button(self._board, pin), button_pins))
         self.potentiometers = list(
             map(lambda pin: Potentiometer(self._board, pin), potentiometer_pins)
         )
         self.rotary_encoders = list(map(lambda pins: RotaryEncoder(self._board, pins), rotary_encoders_pins))
 
-        if variable_bounds is not None:
-            self.variable_bounds = variable_bounds
-            self.potentiometers = self.potentiometers[:len(variable_bounds)] # Cut off unneeded potentiometers
-        else:
+        if variable_bounds is None:
             k = len(potentiometer_pins)
             self.variable_bounds = np.column_stack((np.zeros(k), np.ones(k))) # Ideal, nadir
+        else:
+            self.variable_bounds = variable_bounds
+            self.potentiometers = self.potentiometers[:len(variable_bounds)] # Cut off unneeded potentiometers
     
     def print_over(self, to_print: str) -> None:
         print(to_print, end="\r")
@@ -123,6 +125,7 @@ class Interface:
         print('\nChoose a desired option: red +1, yellow -1, green confirm')
         current = index_start
         self.print_over(f"Currently chosen {current}/{index_max}: {options[current]}")
+
         while not self.buttons[0].click():
             if self.buttons[1].click():
                 current = current +1 if current < index_max else 0
@@ -130,7 +133,7 @@ class Interface:
                 current = current -1 if current > 0 else index_max
             else: continue # Print only if either of the buttons have been clicked
 
-            self.print_over(f"Currently chosen {current}: {options[current]}")
+            self.print_over(f"Currently chosen {current}/{index_max}: {options[current]}")
 
         print()
         return current, options[current]
@@ -153,14 +156,14 @@ class Interface:
         while (True):
             too_much = len(selected_options) >= max_options
             enough = len(selected_options) >= min_options
-            
-            if enough: # Don't ask for confirmation until min value reached
-                if not self.confirmation("If you wish to add a new solution click the green button, if not red"):
-                    break
-            
+
             if too_much:
                 print("Maximun options chosen")
                 break
+
+            if enough: # Don't ask for confirmation until min value reached
+                if not self.confirmation("If you wish to add a new solution click the green button, if not red"):
+                    break
             
             # TODO Clean up
             option_temp = self.choose_from(options_temp) # This will mess up the indices
@@ -207,7 +210,7 @@ class Interface:
         if ((index_max - index_start) % step != 0):
             raise Exception("Won't reach min or max values with selected starting value and step size")
 
-        print('\nChoose a desired option: red +1, yellow -1, green confirm')
+        print(f'\nChoose a desired option: red +{step}, yellow -{step}, green confirm')
         current = index_start
         self.print_over(f"Currently chosen {current}")
 

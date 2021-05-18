@@ -30,7 +30,7 @@ class RotaryEncoder(Component):
     # TODO Make it so that movements when not asked are not accounted for
     def get_value(self, min: float = -np.inf, max: float = np.inf, step: float = 0.01) -> float:
         """
-        Get real time value from the rotary encoder
+        Get the value from the rotary encoder
         Args:
             min (float): Minimun reachable value, defaults to negative infinity
             max (float): Maximun reachabe value, defaults to (positive) infinity

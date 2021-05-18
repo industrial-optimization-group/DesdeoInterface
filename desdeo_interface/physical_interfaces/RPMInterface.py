@@ -43,9 +43,14 @@ class RPMInterface(Interface):
         return self.get_potentiometer_bounded_values("Reference point")
 
     def get_satisfaction(self) -> bool:
+        """
+        Get the DM's satisfaction with the current solutions
+
+        Returns:
+            bool: whether or not the DM is satisfied
+        """
         return self.confirmation("\npress the green button if satisfied, else red")
 
-    # fix, double clicks and stuff
     def pick_solution(self, solutions: np.ndarray) -> int:
         """
         Let the DM choose the desired solution from the different options
