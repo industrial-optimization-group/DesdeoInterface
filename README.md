@@ -4,9 +4,12 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
 
 ## Todo
 * <s>remove stupid files aka pycache</s>
-* fix imports
 * <s>button refining</s>
-* Test button in interface methods, especially double click delays
+    * Okay maybe more button refining, new idea: In button class as a comment
+* Test button in interface methods
+    * Holding seems fine, might be some delay if also excepting a click or a double click
+    * Double click and click don't work well together
+        * i.e wait for double clicks and clicks. if double clicks are first then clicks wont register most of the time because reading a double click
 * Rotary encoder module
     * Done for now, will continue when i actually receive the component
 * Less noise with potentiometers
@@ -14,5 +17,7 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
 * Documentation and commenting standards
 * Read on making modules
 * (nimbusInterface and others)
+    * Nimbus works with one example but not tested with others, so most likely still some issues
 * javascript and slider
     * Arduino leonardo incoming!
+* How to connect multiple arduinos together and get the input to python from each one nicely

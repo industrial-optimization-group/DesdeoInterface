@@ -7,6 +7,9 @@ from desdeo_interface.components.Component import Component
 from pyfirmata import Board
 import time
 
+# Maybe if the button just had an Action method which would wait for any action and return it
+# So it would return None | Click | D_click | Hold
+# This way one could maybe expect multiple actions without hickups
 class Button(Component):
     """
     A button class to handle input from a connected button
@@ -79,7 +82,7 @@ class Button(Component):
         return False
 
 
-# Simple testing for a button
+# testing the button
 if __name__ == "__main__":
     from pyfirmata import Arduino, util
     port = "COM3"  # Serial port the board is connected to
@@ -115,4 +118,18 @@ if __name__ == "__main__":
     print(f"hold the button for {hold_time / 1000} seconds")
     while not button.hold(hold_time):
         pass
+    print("\nButton was held")
+
+    print("\nTesting hold when also waiting for clicks")
+    while not button.hold(hold_time):
+        if (button.double_click()): 
+            print("button doubleclicked")
+        if (button.click()): # Won't always register click because expecting a doubleclick
+            print("button clicked\n")
+
+    
+    while not button.hold(hold_time): 
+        if (button.click()): # Will sometimes register a click even though holding and sometimes not register a click even though just clicking
+            print("button clicked\n")
+
     print("\nButton was held")
