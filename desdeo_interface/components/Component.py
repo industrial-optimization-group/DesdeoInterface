@@ -41,7 +41,8 @@ class Component:
         is_in_range = lambda x: x > max and x < min
         return len(list(filter(is_in_range, pins))) == 0
     
-    def get_pin_values(self):
+    @property
+    def pin_values(self):
         """
         Read the values of the pins assigned to the component
         Returns:

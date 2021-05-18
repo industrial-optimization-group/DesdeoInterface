@@ -20,7 +20,7 @@ class Potentiometer(Component):
 
     def __init__(self, board: Board, pin: int):
         super().__init__(board, [pin], False)
-        self.prev_value = self.get_pin_values()[0]
+        self.prev_value = self.pin_values[0]
 
     #todo int values, as arg and return? not needed?
     def get_value(self, min: float = 0, max: float = 1) -> float:
@@ -36,10 +36,7 @@ class Potentiometer(Component):
         """
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
-        #value_pin = self._get_mode_value() # Option 1
-        value_pin = self.get_pin_values()[0]
-        #if (abs(self.prev_value - value_pin) < 0.05): # Option 2
-        #   value_pin = self.prev_value
+        value_pin = self.pin_values[0]
         current_value = (value_pin * (max - min)) + min
         return round(current_value,3) # Temporary rounding so that printing looks somewhat decent
 
@@ -51,7 +48,7 @@ class Potentiometer(Component):
     def _get_mode_value(self, it: int = 10):
         values = []
         for i in range(it):
-            value = self.get_pin_values()[0]
+            value = self.pin_values[0]
             values.append(value)
         return max(values, key = values.count) # return the mean
 

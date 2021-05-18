@@ -42,7 +42,7 @@ class Button(Component):
         """
         time.sleep(0.01) #wont work without, because pin is unavailable and pyfirmata stalls or something
 
-        clicked = self.get_pin_values()[0] == 1
+        clicked = self.pin_values[0] == 1
 
         if not clicked and self.prev_value:
             self.prev_value = False

@@ -19,6 +19,11 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
 * javascript and slider
     * Arduino leonardo incoming!
 * How to connect multiple arduinos together and get the input to python from each one nicely
+* Better code
+    * clean up duplicates
+    * readability
+    * handlers, encapsulate
+    * @property and @etc
 
 ## Next meeting
 * Semimodular design idea
