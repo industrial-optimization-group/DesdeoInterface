@@ -28,7 +28,7 @@ class RPMInterface(Interface):
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = [],
+        variable_bounds: Optional[np.ndarray] = None,
     ):
         super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
 
@@ -61,7 +61,7 @@ class RPMInterface(Interface):
         when ready press the green button"""
         )
 
-        return self.choose_from(solutions, index_max = len(solutions) - 1)[0]
+        return self.choose_from(solutions)[0]
 
 
 # testing the method

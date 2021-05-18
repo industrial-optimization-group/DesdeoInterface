@@ -33,13 +33,13 @@ class NautilusInterface(Interface):
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = [],
+        variable_bounds: Optional[np.ndarray] = None,
     ):
         super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
     
     def get_iteration_count(self) -> int:
         print("\nSet a new iteration count")
-        return self.choose_from(index_min = 1, index_start = 3)
+        return int(self.choose_from_range(index_min = 1, index_start = 3))
     
     def step_back(self) -> bool:
         return self.confirmation("\nDo you wish to step back? green yes, red no")

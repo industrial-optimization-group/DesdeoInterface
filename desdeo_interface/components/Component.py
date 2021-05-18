@@ -2,10 +2,12 @@ from pyfirmata import Board, Pin
 
 class Component:
     """
-    A base class for components, maybe this was a bad idea as now this is basically pin class from pyfirmata and some components
+    A base class for component
+
     Args:
         board (pyfirmata.Board): The board (Arduino) the component is connected
         pins list[int]: The pins the component is connected to
+
     Raises:
         Exception: a pin doesn't exist on the arduino uno
     """
@@ -36,8 +38,8 @@ class Component:
         Returns:
             bool: Are all the pins between the desired range
         """
-        in_range = lambda x: x > max and x < min
-        return len(list(filter(in_range, pins))) == 0
+        is_in_range = lambda x: x > max and x < min
+        return len(list(filter(is_in_range, pins))) == 0
     
     def get_pin_values(self):
         """
@@ -47,3 +49,10 @@ class Component:
         """
         get_pin_value = lambda pin: pin.read() if pin.read() is not None else -1.0
         return list(map(get_pin_value, self.pins))
+
+    # TODO connect the component to a board
+    # Find the board
+    # Make the connection
+    # Let the board know of the connection
+    def connect_to_board(self, board):
+        return

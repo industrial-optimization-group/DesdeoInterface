@@ -59,7 +59,7 @@ class Interface:
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = None,
+        variable_bounds: Optional[np.ndarray] = None, # [k][0] ideal, [k][1] nadir
     ):
         if variable_bounds is not None:
             if len(variable_bounds) > len(potentiometer_pins) + len(rotary_encoders_pins): # TODO move to validation when migrating to "texas"-model
@@ -84,7 +84,7 @@ class Interface:
             self.potentiometers = self.potentiometers[:len(variable_bounds)] # Cut off unneeded potentiometers
         else:
             k = len(potentiometer_pins)
-            self.variable_bounds = np.column_stack((np.zeros(k), np.ones(k)))
+            self.variable_bounds = np.column_stack((np.zeros(k), np.ones(k))) # Ideal, nadir
     
     def print_over(self, to_print: str) -> None:
         print(to_print, end="\r")
@@ -122,7 +122,7 @@ class Interface:
 
         print('\nChoose a desired option: red +1, yellow -1, green confirm')
         current = index_start
-        self.print_over(f"Currently chosen {current}: {options[current]}")
+        self.print_over(f"Currently chosen {current}/{index_max}: {options[current]}")
         while not self.buttons[0].click():
             if self.buttons[1].click():
                 current = current +1 if current < index_max else 0
@@ -135,8 +135,14 @@ class Interface:
         print()
         return current, options[current]
     
-    # in desdeo_emo/docs/notebooks/Example.ipynb one can choose multiple preferred values
-    def choose_multiple(self, options: np.ndarray, min_options: int = 1, max_options: int = None) -> np.ndarray:
+    # in desdeo_emo/docs/notebooks/Example.ipynb one can choose multiple preferred values. Also in nimbus (saving solutions)
+    # Better implementation idea with the selection wheel:
+        # Display all solutions at once, where?
+        # highlight currently selected
+        # Green to select, red to remove, mark selected
+        # Hold the green button continue 
+        # OR scroll to some continue button (which could be highlighted when selected count is valid) and press it
+    def choose_multiple(self, options: np.ndarray, min_options: int = 1, max_options: int = None) -> List[List]:
         if max_options is None:
             max_options = len(options) # One can choose every option from the list
         if max_options > len(options):
@@ -145,19 +151,24 @@ class Interface:
         selected_options = []
         options_temp = options
         while (True):
-            option = self.choose_from(options_temp)
-            options_temp = np.delete(options_temp, option[0]) # Delete the option from the array so it won't be picked again
-            selected_options.append(option)
             too_much = len(selected_options) >= max_options
-            not_enough = len(selected_options) < min_options
-            print(f"Current selection: {selected_options}")
+            enough = len(selected_options) >= min_options
+            
+            if enough: # Don't ask for confirmation until min value reached
+                if not self.confirmation("If you wish to add a new solution click the green button, if not red"):
+                    break
+            
             if too_much:
                 print("Maximun options chosen")
                 break
-            if not_enough: # Don't ask for confirmation until min value reached
-                continue
-            if not self.confirmation("If you wish to pick another solution click the green button, if not red"):
-                break
+            
+            # TODO Clean up
+            option_temp = self.choose_from(options_temp) # This will mess up the indices
+            options_temp = np.delete(options_temp, option_temp[0], 0) # Delete the option from the array so it won't be picked again
+            option = (np.where(options == option_temp[1])[0][0], option_temp[1]) # Fix the index, TEMP
+            selected_options.append(option)
+            print(f"Current selection: {selected_options}")
+
         return selected_options
         
 

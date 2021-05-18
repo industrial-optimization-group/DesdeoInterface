@@ -1,6 +1,7 @@
 import os, sys
 
 from numpy.core.fromnumeric import var
+from numpy.core.numeric import indices
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 
@@ -28,34 +29,36 @@ class NimbusInterface(Interface):
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = [],
+        variable_bounds: Optional[np.ndarray] = None,
     ):
         super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
     
     #fix, bounds
-    def get_aspiration_level(self) -> float:
+    def get_aspiration_level(self, min, max) -> float:
         print(f"Specify an aspiration level for the objective")
-        return self.get_potentiometer_value()
+        return self.get_potentiometer_value(value_name="Aspiration level", value_min= min, value_max= max)
     
     #fix, bounds
-    def get_upper_bound(self) -> float:
+    def get_upper_bound(self, min, max) -> float:
         print(f"Specify a upper bound for the objective")
-        return self.get_potentiometer_value()
+        return self.get_potentiometer_value(value_name="Upper bound", value_min= min, value_max= max)
     
     def get_classification(self, options: Union[List[str], np.ndarray]) -> str:
-        return self.choose_from(options, index_max=len(options) - 1)[1]
+        return self.choose_from(options)[1]
     
     def get_classifications_and_levels(self, amount) -> Tuple[List[str], List[float]]:
         classification_options = ["<", "<=", "=", ">=", "0"]
         classifications = []
         levels = []
-        for obj_value in range(amount):
-            print(f"Pick a classification level for objective at index {obj_value}")
+        for obj_index in range(amount):
+            print(f"Pick a classification level for objective at index {obj_index}")
             classification = self.get_classification(classification_options)
             if classification == "<=":
-                level = self.get_aspiration_level()
+                min, max = self.variable_bounds[obj_index]
+                level = self.get_aspiration_level(min, max)
             elif classification == ">=":
-                level = self.get_upper_bound()
+                min, max = self.variable_bounds[obj_index]
+                level = self.get_upper_bound(min, max)
             else:
                 level = -1
             levels.append(level)
@@ -64,19 +67,30 @@ class NimbusInterface(Interface):
         return classifications, levels
     
     def specify_solution_count(self):
-        return 0
+        print("Select solution count")
+        return self.choose_from_range(1, 10)
     
-    def pick_preferred_solution(self):
-        return 0
+    def pick_preferred_solution(self, solutions: np.ndarray):
+        return self.choose_from(solutions)[0]
     
     def should_continue(self):
-        return 0
+        return self.confirmation("Continue, green yes, red no")
 
     def try_another_classification(self):
-        return 0
+        return self.confirmation("Try another classification, green yes, red no")
     
     def show_different_alternatives(self):
-        return 0
+        return self.confirmation("Show alternatives, green yes, red no")
+    
+    def save_solutions(self, solutions):
+        selected_solutions = self.choose_multiple(solutions, 0) # Get the solutions
+        selected_solutions = list(map(lambda s: s[0], selected_solutions)) # Only get the indices
+        return selected_solutions
+
+    def choose_two_solutions(self, solutions):
+        selected_solutions = self.choose_multiple(solutions,2,2)
+        selected_solutions = list(map(lambda s: s[0], selected_solutions))
+        return selected_solutions
 
 
 if __name__ == "__main__":
@@ -84,6 +98,25 @@ if __name__ == "__main__":
     from desdeo_problem.Problem import MOProblem
     from desdeo_problem.Variable import variable_builder
     from desdeo_problem.Objective import _ScalarObjective
+
+    def plot(request_type: str):
+        plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
+        plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
+        plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
+        if request_type == "preferred":
+            for i, z in enumerate(preferred_request.content["objectives"]):
+                plt.scatter(z[0], z[1], label=f"solution {i}")
+        elif request_type == "save":
+            for i, z in enumerate(save_request.content["objectives"]):
+                plt.scatter(z[0], z[1], label=f"solution {i}")
+        else:
+            for i, z in enumerate(intermediate_request.content["objectives"]):
+                plt.scatter(z[0], z[1], label=f"solution {i}")
+        plt.xlabel("f1")
+        plt.ylabel("f2")
+        plt.title("Approximate Pareto front of the Kursawe function")
+        plt.legend()
+        plt.show()
     
     def f_1(xs: np.ndarray):
         xs = np.atleast_2d(xs)
@@ -109,9 +142,9 @@ if __name__ == "__main__":
     ideal=np.array([-20, -12])
 
     problem = MOProblem(variables=varsl, objectives=[f1, f2], ideal=ideal, nadir=nadir)
-    interface = NimbusInterface("COM3", button_pins=[2,3,4], potentiometer_pins=[0,1,2], variable_bounds= np.column_stack((nadir, ideal)))
+    interface = NimbusInterface("COM3", button_pins=[2,3,4], potentiometer_pins=[0,1,2], variable_bounds= np.column_stack((ideal, nadir)))
 
-
+    
     from desdeo_mcdm.utilities.solvers import solve_pareto_front_representation
 
     p_front = solve_pareto_front_representation(problem, step=1.0)[1]
@@ -131,135 +164,82 @@ if __name__ == "__main__":
 
     classification_request, plot_request = method.start()
 
-    print(classification_request.content["message"])
-    classifications, levels = interface.get_classifications_and_levels(2)
+    print(classification_request.content["message"]) # Divide objective functions
+    
+    objective_count = len(problem.objectives)
+    classifications, levels = interface.get_classifications_and_levels(objective_count)
+    solution_count = interface.specify_solution_count()
 
     response = {
         "classifications": classifications,
-        "number_of_solutions": 3,
-        "levels": [0, -5]
+        "number_of_solutions": solution_count,
+        "levels": levels
     }
     classification_request.response = response
 
     save_request, plot_request = method.iterate(classification_request)
+    next_request = "save" # TEMP
+    while True:
+        if next_request == "save": # Then we need to specify indices for later viewing
+            print(save_request.content['message'])
+            objectives = save_request.content['objectives']
+            print(objectives)
+            saved_solutions = interface.save_solutions(objectives) # Get desired indices from the interface
+            save_request.response = {"indices": saved_solutions}
+            intermediate_request, plot_request = method.iterate(save_request)
+            next_request = "intermediate"
 
-    print(save_request.content.keys())
-    print(save_request.content["message"])
-    print(save_request.content["objectives"])
+        elif next_request == "intermediate": # See intermediate solutions?
+            print(intermediate_request.content["message"])
+            solutions = intermediate_request.content["solutions"]
+            see_intermediate_solutions = interface.show_different_alternatives()
+            if see_intermediate_solutions:
+                sol = interface.choose_two_solutions(solutions)
+                number_of_desired_solutions = interface.specify_solution_count()
+                response = {"number_of_desired_solutions": number_of_desired_solutions, "indices": sol}
+                intermediate_request.response = response
+                save_request, plot_request = method.iterate(intermediate_request)
+                next_request = "save"
+            else:
+                response = {"number_of_desired_solutions": 0, "indices": []}
+                intermediate_request.response = response
+                preferred_request, plot_request = method.iterate(intermediate_request)
+                next_request = "preferred"
+        
+        elif next_request == "preferred":
+            print(preferred_request.content["message"])
+            solutions = preferred_request.content["solutions"]
+            preferred_solution = interface.pick_preferred_solution(solutions)
+            should_continue = interface.should_continue()
+            preferred_request.response = {"index": preferred_solution, "continue": should_continue}
+            if not should_continue:
+                break
+            classification_request, plot_request = method.iterate(preferred_request)
+            next_request = "classification"
+        
+        elif next_request == "classification":
+            print(classification_request.content["message"])
+            objective_count = len(problem.objectives)
+            classifications, levels = interface.get_classifications_and_levels(objective_count)
+            solution_count = interface.specify_solution_count()
+            response = {
+                "classifications": classifications,
+                "number_of_solutions": solution_count,
+                "levels": levels
+            }
+            classification_request.response = response
+            save_request, plot_request = method.iterate(classification_request)
+            next_request = "save"
 
-    response = {"indices": [0, 2]}
-    save_request.response = response
-
-    intermediate_request, plot_request = method.iterate(save_request)
-
-    print(intermediate_request.content.keys())
-    print(intermediate_request.content["message"])
-
-    response = {"number_of_desired_solutions": 0, "indices": []}
-    intermediate_request.response = response
-
-    preferred_request, plot_request = method.iterate(intermediate_request)
-    print(preferred_request.content.keys())
-    print(preferred_request.content["message"])
-
-    plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
-    plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
-    plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
-    for i, z in enumerate(preferred_request.content["objectives"]):
-        plt.scatter(z[0], z[1], label=f"solution {i}")
-    plt.xlabel("f1")
-    plt.ylabel("f2")
-    plt.title("Approximate Pareto front of the Kursawe function")
-    plt.legend()
-    plt.show()
-
-    response = {"index": 1, "continue": True}
-    preferred_request.response = response
-
-    classification_request, plot_request = method.iterate(preferred_request)
+        plot(next_request)
 
     response = {
-        "classifications": [">=", "<"],
-        "number_of_solutions": 4,
-        "levels": [-16, -1]
+        "classifications": classifications,
+        "number_of_solutions": solution_count,
+        "levels": levels
     }
     classification_request.response = response
 
-    save_request, plot_request = method.iterate(classification_request)
-
-    plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
-    plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
-    plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
-    for i, z in enumerate(save_request.content["objectives"]):
-        plt.scatter(z[0], z[1], label=f"solution {i}")
-    plt.xlabel("f1")
-    plt.ylabel("f2")
-    plt.title("Approximate Pareto front of the Kursawe function")
-    plt.legend()
-    plt.show()
-
-    response = {"indices": [0, 1, 2, 3]}
-    save_request.response = response
-
-    intermediate_request, plot_request = method.iterate(save_request)
-
-    plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
-    plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
-    plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
-    for i, z in enumerate(intermediate_request.content["objectives"]):
-        plt.scatter(z[0], z[1], label=f"solution {i}")
-    plt.xlabel("f1")
-    plt.ylabel("f2")
-    plt.title("Approximate Pareto front of the Kursawe function")
-    plt.legend()
-    plt.show()
-
-    response = {
-        "indices": [3, 4],
-        "number_of_desired_solutions": 3,
-        }
-    intermediate_request.response = response
-
-    save_request, plot_request = method.iterate(intermediate_request)
-
-    plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
-    plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
-    plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
-    for i, z in enumerate(save_request.content["objectives"]):
-        plt.scatter(z[0], z[1], label=f"solution {i}")
-    plt.xlabel("f1")
-    plt.ylabel("f2")
-    plt.title("Approximate Pareto front of the Kursawe function")
-    plt.legend()
-    plt.show()
-
-    response = {"indices": [1]}
-    save_request.response = response
-
-    intermediate_request, plot_request = method.iterate(save_request)
-
-    response = {"number_of_desired_solutions": 0, "indices": []}
-    intermediate_request.response = response
-
-    preferred_request, plot_request = method.iterate(intermediate_request)
-
-    plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
-    plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
-    plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
-    for i, z in enumerate(preferred_request.content["objectives"]):
-        plt.scatter(z[0], z[1], label=f"solution {i}")
-    plt.xlabel("f1")
-    plt.ylabel("f2")
-    plt.title("Approximate Pareto front of the Kursawe function")
-    plt.legend()
-    plt.show()
-
-    response = {
-        "index": 6,
-        "continue": False,
-    }
-
-    preferred_request.response = response
 
     stop_request, plot_request = method.iterate(preferred_request)
 
