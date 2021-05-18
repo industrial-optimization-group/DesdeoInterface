@@ -3,7 +3,7 @@ p = os.path.abspath('.')
 sys.path.insert(1, p)
 
 from desdeo_interface.components.Component import Component
-
+from typing import List
 from pyfirmata import Board
 
 # TIP It helps with the noise a little if you add a capacitor to the pots
@@ -17,7 +17,6 @@ class Potentiometer(Component):
         Exception: analog pin doesn't exist on the arduino uno
     """
 
-    prev_value: float
 
     def __init__(self, board: Board, pin: int):
         super().__init__(board, [pin], False)

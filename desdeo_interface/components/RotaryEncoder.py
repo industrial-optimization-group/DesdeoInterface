@@ -8,6 +8,8 @@ from pyfirmata import Board
 import numpy as np
 import time # For dynamic step sizes
 
+from typing import List
+
 class RotaryEncoder(Component):
     current_value: float # Value of the encoder
     state: int # The position of the encoder, 1 or 0
@@ -15,10 +17,10 @@ class RotaryEncoder(Component):
 
     # Needed for dynamic values: 
     # Record times of each rotations, check which have happened in the last second, calculate rotations per second, adjust step size accordingly
-    rotations: list[float] = [] # list of rotation start times
+    rotations: List[float] = [] # list of rotation start times
 
 
-    def __init__(self, board: Board, pins: list[int]):
+    def __init__(self, board: Board, pins: List[int]):
         if len(pins) != 2:
             raise Exception("Rotary encoder needs 2 digital pins")
         super().__init__(board, pins, True)

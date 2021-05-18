@@ -47,9 +47,9 @@ class Interface:
 
     _board: Arduino
     _it: util.Iterator
-    buttons: list[Button]
-    potentiometers: list[Potentiometer]
-    rotary_encoders: list[RotaryEncoder]
+    buttons: List[Button]
+    potentiometers: List[Potentiometer]
+    rotary_encoders: List[RotaryEncoder]
     variable_bounds: Optional[np.ndarray]
 
     #Todo default values

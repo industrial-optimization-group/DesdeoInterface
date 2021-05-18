@@ -7,6 +7,13 @@ from desdeo_interface.components.Component import Component
 from pyfirmata import Board
 import time
 
+from enum import Enum
+class Action(Enum):
+    CLICK = 1
+    DOUBLE_CLICK = 2
+    HOLD = 3
+    NO_ACTION = 4
+
 # Maybe if the button just had an Action method which would wait for any action and return it
 # So it would return None | Click | D_click | Hold
 # This way one could maybe expect multiple actions without hickups
@@ -76,10 +83,28 @@ class Button(Component):
         start_time = time.time()
         self.click()
         while (self.prev_value): # Prev value will be false if button has been released
-            print(f"time left: {start_time + hold_time_s - time.time()}", end='\r') # Trying out, seems to work
+            #print(f"time left: {start_time + hold_time_s - time.time()}", end='\r') # Trying out, seems to work
             if (start_time + hold_time_s <= time.time()): return True # Button has been held for desired hold time
             self.click() # if button is released then prev value = False
         return False
+    
+    # Maybe
+    def action(self, hold_time_ms = 1000, max_time_between_clicks_ms = 250) -> Action:
+        hold_time_s = hold_time_ms / 1000
+        max_time_between_clicks_s = max_time_between_clicks_ms / 1000
+        start_time = time.time()
+
+        first_click = self.click()
+        if not first_click: return Action.NO_ACTION
+
+        while (self.prev_value): # Check for holding
+            if (start_time + hold_time_s <= time.time()): return Action.HOLD
+            self.click() # Check if still holding, if not then look for double click
+        
+        while (start_time + (max_time_between_clicks_s) > time.time()):
+            if self.click(): return Action.DOUBLE_CLICK
+        
+        return Action.CLICK
 
 
 # testing the button
@@ -91,45 +116,51 @@ if __name__ == "__main__":
     it = util.Iterator(board)
     it.start()
     button = Button(board, pin)
-    print("Click the button to continue")
-    while not button.click():
-        pass
-    print("Button clicked!")
+    # Testing action
+    clicks_b2b = 0
+    while clicks_b2b <= 10: # If 10 clicks back to back quit
+        print(button.action())
 
-    print("Click the button again to continue")
-    while not button.click():
-        pass
-    print("Button clicked!")
+    # Testing basic methods
+    # print("Click the button to continue")
+    # while not button.click():
+    #     pass
+    # print("Button clicked!")
 
-    times = 5
-    print(f"Click the button {times} times to continue")
-    for i in range(times):
-        print(f"{times - i} left")
-        while not button.click():
-            pass
-    print(f"Button clicked {times} times")
+    # print("Click the button again to continue")
+    # while not button.click():
+    #     pass
+    # print("Button clicked!")
 
-    print("Double click the button")
-    while not button.double_click():
-        pass
-    print("Button double clicked!")
+    # times = 5
+    # print(f"Click the button {times} times to continue")
+    # for i in range(times):
+    #     print(f"{times - i} left")
+    #     while not button.click():
+    #         pass
+    # print(f"Button clicked {times} times")
 
-    hold_time = 1500
-    print(f"hold the button for {hold_time / 1000} seconds")
-    while not button.hold(hold_time):
-        pass
-    print("\nButton was held")
+    # print("Double click the button")
+    # while not button.double_click():
+    #     pass
+    # print("Button double clicked!")
 
-    print("\nTesting hold when also waiting for clicks")
-    while not button.hold(hold_time):
-        if (button.double_click()): 
-            print("button doubleclicked")
-        if (button.click()): # Won't always register click because expecting a doubleclick
-            print("button clicked\n")
+    # hold_time = 1500
+    # print(f"hold the button for {hold_time / 1000} seconds")
+    # while not button.hold(hold_time):
+    #     pass
+    # print("\nButton was held")
+
+    # print("\nTesting hold when also waiting for clicks")
+    # while not button.hold(hold_time):
+    #     if (button.double_click()): 
+    #         print("button doubleclicked")
+    #     if (button.click()): # Won't always register click because expecting a doubleclick
+    #         print("button clicked\n")
 
     
-    while not button.hold(hold_time): 
-        if (button.click()): # Will sometimes register a click even though holding and sometimes not register a click even though just clicking
-            print("button clicked\n")
+    # while not button.hold(hold_time): 
+    #     if (button.click()): # Will sometimes register a click even though holding and sometimes not register a click even though just clicking
+    #         print("button clicked\n")
 
-    print("\nButton was held")
+    # print("\nButton was held")

@@ -1,5 +1,5 @@
 from pyfirmata import Board, Pin
-
+from typing import List
 class Component:
     """
     A base class for component
@@ -12,9 +12,9 @@ class Component:
         Exception: a pin doesn't exist on the arduino uno
     """
 
-    pins: list[Pin]
+    pins: List[Pin]
 
-    def __init__(self, board: Board, pins: list[int], is_digital: bool):
+    def __init__(self, board: Board, pins: List[int], is_digital: bool):
         if is_digital:
             if not self._validate_pins(pins, 2, 13):
                 raise Exception("Pin is invalid, should be in the range on 2-13")
@@ -24,7 +24,7 @@ class Component:
                 raise Exception("Pin is invalid, should be in the range on 0-5")
             self.pins = list(map(lambda pin: board.get_pin(f'a:{pin}:i'), pins))
     
-    def _validate_pins(self, pins: list[int], min: int, max: int) -> bool:
+    def _validate_pins(self, pins: List[int], min: int, max: int) -> bool:
         """
         Checks if all the pins in the list are between min and max both are inclusive
         Example:
