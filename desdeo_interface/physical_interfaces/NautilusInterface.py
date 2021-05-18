@@ -61,18 +61,19 @@ class NautilusInterface(Interface):
         bound_max = len(self.potentiometers)
         return self.get_potentiometer_values_int("rankings", 1, bound_max)
     
-    #fix
+    # This would be much easier and cleaner with rotary encoder
+    # Also I'd like that each value could be adjusted at the same time, now we go one by one
     def get_preference_info_percentages(self):
         print("\nUse the potentiometers to set percentages to the objectives, green to confirm")
+        n = len(self.potentiometers) # I'd rather get n from somewhere else
+        percentages = []
         used_percentage = 0
-        while not self.buttons[0].click():
-            for pot in self.potentiometers:
-                percentage = pot.get_value(0,100-used_percentage)
-                used_percentage += percentage
-                percentages = []
-                percentages.append(percentage)
-            self.print_over(f"Current percentages: {percentages}")
-        print("\n\n")
+        for pot in range(n-1):
+            percentage = self.get_potentiometer_value(f"pot {pot}: percentage", 0, 100-used_percentage, pot)
+            used_percentage += percentage
+            percentages.append(percentage)
+        percentages.append(100-used_percentage) # Last one depends on the other selections
+        print(f"Chosen percentages: {percentages}")
         return percentages
 
 
