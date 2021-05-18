@@ -10,7 +10,7 @@ from desdeo_interface.components.Component import Component
 from pyfirmata import Arduino, util
 from time import sleep
 import numpy as np
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional, List, Tuple, Any
 
 class InterfaceException(Exception):
     """
@@ -252,7 +252,6 @@ class Interface:
         print("\n\n")
         return np.array(values)
 
-    #I can merge both from below to the upper one but do i want to
     def get_potentiometer_bounded_values(self, value_name: str = "values") -> np.array:
         print("\nPress the green button when you're ready")
         if self.variable_bounds is None:
@@ -276,6 +275,19 @@ class Interface:
             if self.buttons[0].click(): break
         print("\n\n")
         return np.array(values)
+
+    # I'd maybe like to migrate every selection method to something this and get rid of the third button
+    def choose_with_wheel(self, options: np.ndarray) -> Any:
+        print("Press the confirm button when ready")
+        options_n = len(options)
+        while (True):
+            current_value = self.rotary_encoders[0].get_value(0, options_n, 1)
+            self.print_over(current_value)
+            if (self.buttons[0].click()): break
+        return current_value
+    
+
+    # MAYBE
 
     # TODO
     # Connect a component to the interface
