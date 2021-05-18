@@ -24,9 +24,6 @@ class NautilusInterface(Interface):
         InterfaceException: Has less than three buttons.
     """
 
-    it_count: int = 3 #Iteration count, default is 3
-    preference: np.ndarray
-
     def __init__(
         self,
         port: str,
@@ -37,26 +34,65 @@ class NautilusInterface(Interface):
     ):
         super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
     
-    def get_iteration_count(self) -> int:
+    def get_iteration_count(self, index_start: int = 3) -> int:
+        """
+        Choose the iteration count for nautilusnavigator
+
+        Args:
+            index_start (int): The starting point
+
+        Returns:
+            int: Desired iteration count
+        """
         print("\nSet a new iteration count")
-        return int(self.choose_from_range(index_min = 1, index_start = 3))
+        return int(self.choose_from_range(index_min = 1, index_start = index_start))
     
     def step_back(self) -> bool:
+        """
+        Does the DM want to step back
+
+        Returns:
+            bool: Whether or not to step back 
+        """
         return self.confirmation("\nDo you wish to step back? green yes, red no")
     
     def short_step(self) -> bool:
+        """
+        Does the DM want to take short step when stepping back
+
+        Returns:
+            bool: Whether or not to short step 
+        """
         return self.confirmation("\nshort step? green yes, red no")
     
     def use_previous_preference(self):
+        """
+        Does the DM want to use the previous preference
+
+        Returns:
+            bool: Whether or not to use previous preference
+        """
         return self.confirmation("\nDo you wish to use previous preference? green yes, red no")
         
-    def get_preference_method(self): #Maybe to parent as select from
+    def get_preference_method(self):
+        """
+        Ask the DM for the desired preference method
+
+        Returns:
+            int: The desired preference method, where 1 is relative ranking and 2 is percentages
+        """
         print("\nSelect the method: green = relative_ranking, red = percentages")
         while True:
             if self.buttons[0].click(): return 1
             if self.buttons[1].click(): return 2
     
     def get_preference_info_relative_ranking(self):
+        """
+        Get relative rankings for objective preferences
+
+        Returns:
+            List[int]: A list of relative rankings for each objective
+        """
         print("\nUse the potentiometers to set relative rankings to the objectives, green to confirm")
         bound_max = len(self.potentiometers)
         return self.get_potentiometer_values_int("rankings", 1, bound_max)
@@ -64,6 +100,12 @@ class NautilusInterface(Interface):
     # This would be much easier and cleaner with rotary encoder
     # Also I'd like that each value could be adjusted at the same time, now we go one by one
     def get_preference_info_percentages(self):
+        """
+        Get percentages for objective preferences
+
+        Returns:
+            List[int]: A list of percentages for each objective
+        """
         print("\nUse the potentiometers to set percentages to the objectives, green to confirm")
         n = len(self.potentiometers) # I'd rather get n from somewhere else
         percentages = []

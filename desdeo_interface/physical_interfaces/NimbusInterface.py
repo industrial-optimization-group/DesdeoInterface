@@ -33,26 +33,59 @@ class NimbusInterface(Interface):
     ):
         super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
     
-    #fix, bounds
     def get_aspiration_level(self, min, max) -> float:
+        """
+        Get an aspiration level for an objective
+
+        Args:
+            min (float): Minimum value for the aspiration level
+            max (float): Maximum value for the aspiration level
+
+        Returns:
+            float: Chosen aspiration level
+        """
         print(f"Specify an aspiration level for the objective")
         return self.get_potentiometer_value(value_name="Aspiration level", value_min= min, value_max= max)
-    
-    #fix, bounds
+
     def get_upper_bound(self, min, max) -> float:
+        """
+        Get an upper bound for an objective
+
+        Args:
+            min (float): Minimum value for the bound
+            max (float): Maximum value for the bound
+
+        Returns:
+            float: Chosen upper bound
+        """
         print(f"Specify a upper bound for the objective")
         return self.get_potentiometer_value(value_name="Upper bound", value_min= min, value_max= max)
     
-    def get_classification(self, options: Union[List[str], np.ndarray]) -> str:
-        return self.choose_from(options)[1]
-    
-    def get_classifications_and_levels(self, amount) -> Tuple[List[str], List[float]]:
+    def get_classification(self) -> str:
+        """
+        Choose a classification for an objective from ["<", "<=", "=", ">=", "0"]
+
+        Returns:
+            str: Chosen classification
+        """
         classification_options = ["<", "<=", "=", ">=", "0"]
+        return self.choose_from(classification_options)[1]
+    
+    def get_classifications_and_levels(self, objective_count) -> Tuple[List[str], List[float]]:
+        """
+        Choose a classification and levels for each objective 
+
+        Args:
+            objective_count (int): how many objectives to classificate
+
+        Returns:
+            str: Chosen classification
+        """
         classifications = []
         levels = []
-        for obj_index in range(amount):
+        for obj_index in range(objective_count):
             print(f"Pick a classification level for objective at index {obj_index}")
-            classification = self.get_classification(classification_options)
+            classification = self.get_classification()
             if classification == "<=":
                 min, max = self.variable_bounds[obj_index]
                 level = self.get_aspiration_level(min, max)
@@ -67,27 +100,75 @@ class NimbusInterface(Interface):
         return classifications, levels
     
     def specify_solution_count(self):
+        """
+        Specify the amount of solutions to be calculated in the next step
+
+        Returns:
+            int: The amount of solutions to be calculated
+        """
         print("Select solution count")
         return self.choose_from_range(1, 10)
     
     def pick_preferred_solution(self, solutions: np.ndarray):
+        """
+        Let the DM pick a preferred solution from a list of solutions
+
+        Returns:
+            Any: The preferred solution
+        """
         return self.choose_from(solutions)[0]
     
     def should_continue(self):
+        """
+        Should the method be continued or stopped
+
+        Returns:
+            bool: Whether or not to continue
+        """
         return self.confirmation("Continue, green yes, red no")
 
     def try_another_classification(self):
+        """
+        Does the DM want to try another set of classifications
+
+        Returns:
+            bool: Whether or not to change classifications
+        """
         return self.confirmation("Try another classification, green yes, red no")
     
     def show_different_alternatives(self):
+        """
+        Does the DM want to see different alternatives
+
+        Returns:
+            bool: Whether or not to see different alternatives
+        """
         return self.confirmation("Show alternatives, green yes, red no")
     
     def save_solutions(self, solutions):
+        """
+        Let the DM pick solutions they want to be saved
+
+        Args:
+            solutions (np.ndarray): Array of selectable solutions
+
+        Returns:
+            List: A list of the solutions the DM wants to save
+        """
         selected_solutions = self.choose_multiple(solutions, 0) # Get the solutions
         selected_solutions = list(map(lambda s: s[0], selected_solutions)) # Only get the indices
         return selected_solutions
 
     def choose_two_solutions(self, solutions):
+        """
+        Let the DM choose two solutions for the intermediate solutions step
+
+        Args:
+            solutions (np.ndarray): Array of selectable solutions
+
+        Returns:
+            List: A list with the two chosen solutions
+        """
         selected_solutions = self.choose_multiple(solutions,2,2)
         selected_solutions = list(map(lambda s: s[0], selected_solutions))
         return selected_solutions
