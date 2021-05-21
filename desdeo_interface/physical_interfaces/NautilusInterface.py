@@ -222,8 +222,8 @@ if __name__ == "__main__":
 
         use_previous_preference = False if step_back else interface.use_previous_preference()
         if not use_previous_preference:
-            interface.get_preference_method()
-
+            preference_method = interface.get_preference_method()
+            
             if preference_method == 1:
                 preference_info = interface.get_preference_info_relative_ranking()
             else: 

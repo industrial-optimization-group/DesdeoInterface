@@ -10,9 +10,11 @@ import time # For dynamic step sizes
 
 from typing import List
 
+
+# TODO fix delay
 class RotaryEncoder(Component):
     current_value: float # Value of the encoder
-    state: int # The position of the encoder, 1 or 0
+    #state: int # The position of the encoder, 1 or 0
     state_prev: int # the previous position of the encoder, 1 or 0
 
     # Needed for dynamic values: 
@@ -28,7 +30,7 @@ class RotaryEncoder(Component):
         self.current_value = 0
     
     # TODO Make it so that movements when not asked are not accounted for
-    def get_value(self, min: float = -np.inf, max: float = np.inf, step: float = 0.01) -> float:
+    def get_value(self, min: float = None, max: float = None, step: float = 0.01) -> float:
         """
         Get the value from the rotary encoder
         Args:
@@ -38,38 +40,53 @@ class RotaryEncoder(Component):
         Returns:
             float: the current value from the rotary encoder
         """
+        if (min is None) != (max is None): return # Xor: return if only one is None
+        if min is None and max is None: 
+            min = -np.inf
+            max = np.inf
+
+        elif (min >= max): return
+        
         pin0, pin1 = self.pin_values
-        self.state = pin0
 
         # if current state is different than prev state then rotary encoder has moved
-        if (pin1 != self.state_prev and pin0 == 1): # Only react when pin0 is equal to one 
-            self.rotations.append(time.time()) # Add the rotation time to rotations list, needed for dynamic steps
-            self.current_value += self._determine_direction(pin1) * step 
+        if (pin0 != self.state_prev and pin0 == 1): 
+            self.rotations.append(time.time()) # Add the rotation (time) to rotations list, needed for dynamic steps
+            self.current_value += self._determine_direction(pin0, pin1) * step 
+            # Make sure the values don't exceed bounds: Rather make them loop
+            if self.current_value > max: self.current_value = min
+            elif self.current_value < min: self.current_value = max
         
+        self.update_rotations_list()
         self.state_prev = pin0
         return self.current_value
     
-    def get_dynamic_value(self, min: float = -np.inf, max: float = np.inf):
+    def get_dynamic_value(self, min: float = -np.inf, max: float = np.inf, step = 0.01):
         """
         get the value of the potentiometer with dynamic step sizes, slow turns => smaller steps => more accuracy
         Args:
             min (float): Minimun reachable value, defaults to negative infinity
             max (float): Maximun reachabe value, defaults to (positive) infinity
+            step (float): Base step value when at 'normal' rotation speeds
         Returns:
             float: the current value from the rotary encoder
         """
 
-        # calculate rps
-        self.rotations = list(filter(lambda t: t > time.time() - 1)) # Filter out the rotations which happened more than a second ago
         rps = len(self.rotations) # Rotations per second
+
+        # According to my large-scale testing:
+        # rps values close to 8 are the values you get when turning the encoder at normal speeds
+        # 1-4 are slow and anything above 15 is quite fast at best reaching 35-40 rps
+        # This all might change when there is a shell over the encoder
 
         # Calculate the step size as a function of rps
         # TODO this function could be a argument and the default needs to be something nicer but i'll think of it later
-        step = np.log2(rps + 0.01) 
+        step = ((rps + 1)/8.) * step
+        step = step * 2
 
-        return self.get_value(min,max, step)
+        return self.get_value(min, max, step)
     
-    def _determine_direction(self, pin1):
+    def _determine_direction(self, pin0, pin1):
         """
         Get the rotation direction from the rotary encoder
         Args:
@@ -77,6 +94,25 @@ class RotaryEncoder(Component):
         Returns:
             int: the direction the rotary encoder has been moved
         """
-        return -1 if self.state != pin1 else 1
-
+        return -1 if pin0 != pin1 else 1
     
+    def update_rotations_list(self):
+        # Filter out the rotations which happened more than a second ago
+        self.rotations = list(filter(lambda t: t > time.time() - 1, self.rotations)) 
+        
+
+
+if __name__ == "__main__":
+    from pyfirmata import Arduino, util
+    port = "COM3"  # Serial port the board is connected to
+    pins = [8,9]  # pins the rotary encoder is connected
+    board = Arduino(port)
+    it = util.Iterator(board)
+    it.start()
+    rot_enc = RotaryEncoder(board, pins)
+    prev_value = rot_enc.current_value
+    while True:
+        value = rot_enc.get_dynamic_value(step = 1)
+        if value != prev_value:
+            prev_value = value
+            print(value)

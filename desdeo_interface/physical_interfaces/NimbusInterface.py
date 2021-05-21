@@ -107,7 +107,7 @@ class NimbusInterface(Interface):
             int: The amount of solutions to be calculated
         """
         print("Select solution count")
-        return self.choose_from_range(1, 10)
+        return self.choose_from_range(1, 4)
     
     def pick_preferred_solution(self, solutions: np.ndarray):
         """

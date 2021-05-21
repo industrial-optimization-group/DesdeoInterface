@@ -62,13 +62,13 @@ if __name__ == "__main__":
         print(f"current value = {val}", end="\r")
 
     port = "COM3"  # Serial port the board is connected to
-    pin = 0  # Analog pin the potentiometer is connected to
+    pin = 5  # Analog pin the potentiometer is connected to
     board = Arduino(port)
     it = util.Iterator(board)
     it.start()
     pot = Potentiometer(board, pin)
 
-    print("Turn the potentiometer far right")
+    print("Turn the potentiometer far left")
     current_value = 0.5
     eps = 0.05
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
         current_value = pot.get_value()
         print_value(current_value)
 
-    print("\nTurn the potentiometer far left")
+    print("\nTurn the potentiometer far right")
     while pot.get_value() < 1-eps:
         current_value = pot.get_value()
         print_value(current_value)

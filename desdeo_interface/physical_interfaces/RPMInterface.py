@@ -169,6 +169,8 @@ if __name__ == "__main__":
         print("Additional solutions: ", req.content["additional_solutions"])
         satisfied = interface.get_satisfaction()
     
+    
+    
     solutions = np.concatenate(([req.content["current_solution"]], req.content["additional_solutions"]))
     solution_index = interface.pick_solution(solutions)
     req.response = {"satisfied": satisfied, "solution_index": solution_index}

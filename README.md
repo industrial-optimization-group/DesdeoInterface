@@ -27,13 +27,7 @@ The arduino is loaded with standard firmata: found from arduino ide -> file -> e
 
 
 ## Next meeting
-* Semimodular design idea
-    * I think the user will always need something to confirmation button and a scroll to select from a list or to choose a value. -So let the master have 2 buttons and a wheel integrated in it for selection, confirmation and declination
-        * Other components can be added for different use cases
-    * a UI for the physical interface where the user could configure and test the components would be awesome and a looot of work
-* Who (which class) takes care that the physical interface gets the correct inputs in the correct time
-    * The user could define the problem and then start the interface with the problem and the interface could take care of rest
-    * i.e check nimbusinterface or RPMinterface
-* Connecting microcontrollers (components) to master and sending the data from slaves to python might be difficult
-    * How will each microcontroller know what component it is? Like a button or a rotary encoder?
-    * Slave sends to master -> master sends to python
+* Things working:
+    * Sliding potentiometer
+* Questions:
+    * Does someone know how to send and handle signals in python
