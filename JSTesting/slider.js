@@ -1,35 +1,74 @@
-const el_slider = document.getElementById("slider");
-const el_value = document.getElementById("value");
-const el_slider_range = document.getElementById("range");
-const el_button_connect = document.getElementById("connect");
-const el_button_print = document.getElementById("print");
+(function() {
+  'use strict';
 
-let device;
-el_button_connect.onclick = () => getDevice();
-el_button_print.onclick = () => {
-  if (device != undefined) {
-    console.log(device.productName)
-  } else {console.log("No device connected!")}
-};
+  document.addEventListener('DOMContentLoaded', event => {
+    const slider = document.getElementById("slider");
+    const valueText = document.getElementById("value");
+    const sliderRange = document.getElementById("range");
+    const connectButton = document.getElementById("connect");
+    const printButton = document.getElementById("print");
+
+    let device;
+    connectButton.onclick = () => {
+      if (device == undefined) {connect();}
+      else {disconnect();}
+    };
+
+    printButton.onclick = () => {
+      if (device != undefined) {
+        console.log(device.productName);
+      } else {console.log("No device connected!")}
+    };
+
+    const sliderMin = 0
+    const sliderMax = 1000
+    sliderRange.innerHTML = sliderMin + ", " + sliderMax
+
+    slider.min = sliderMin
+    slider.max = sliderMax
+
+    slider.onchange = () => valueText.innerHTML = slider.value
 
 
-//C:\Users\Stefu\Downloads\arduino-gh-pages\arduino-gh-pages\library
-const slider_min = 0
-const slider_max = 1000
-el_slider_range.innerHTML = slider_min + ", " + slider_max
-
-el_slider.min = slider_min
-el_slider.max = slider_max
-
-el_slider.onchange = () => el_value.innerHTML = slider.value
-
-
+    // function connect() {
+    //   navigator.usb.requestDevice({ filters: [{ vendorId: 0x2341 }] })
+    //   .then(selectedDevice => {
+    //       device = selectedDevice;
+    //       connectButton.innerHTML = "Disconnect";
+    //       return device.open();
+    //     })
+    //     .catch(error => { console.error(error); });
+    // }
 
 
-function getDevice() {
-  navigator.usb.requestDevice({ filters: [{ vendorId: 0x2341 }] })
-  .then(selectedDevice => {
-      device = selectedDevice
-    })
-    .catch(error => { console.error(error); });
-}
+    function disconnect() {
+      connectButton.innerHTML = "Connect";
+      device.close()
+      device = undefined
+    }
+
+    function onUpdate() {
+      if (device == undefined) {return;}
+    }
+
+
+    let port;
+
+    function connect() {
+      port.connect().then(() => {
+        statusDisplay.textContent = '';
+        connectButton.textContent = 'Disconnect';
+
+        port.onReceive = data => {
+          let textDecoder = new TextDecoder();
+          console.log(textDecoder.decode(data));
+        }
+        port.onReceiveError = error => {
+          console.error(error);
+        };
+      }, error => {
+        statusDisplay.textContent = error;
+      });
+    }
+  });
+})();
