@@ -1,7 +1,12 @@
+from desdeo_problem.Variable import Variable
+
 import os, sys
+
+from numpy.core.fromnumeric import var
 p = os.path.abspath('.')
 sys.path.insert(1, p)
-
+from desdeo_interface.components.Master import Master
+from desdeo_problem.Problem import MOProblem
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
 from desdeo_interface.components.RotaryEncoder import RotaryEncoder
@@ -19,74 +24,45 @@ class InterfaceException(Exception):
 
     pass
 
-
-# Each component will have it's own microcontroller
-# First component to be connected to pc will be the "master" which is actually connected to the pc by usb or some other way, other components will be connected to this "master" by wires\bt\wifi\radio etc
-# I guess the master will act as an "interface" which handles scaling, exceptions and so on
-# When I'll have a second microcontroller I'll try this connecting and modify the interface accordingly 
-
-# Modifications for the future:
-# A component could initialize the interface and others could then connect to it
-# Or a default master component
 class Interface:
     """
     A interface class to handle the Decision Maker's inputs given with a physical interface (Arduino)
     Args:
-        port (str): The serial port Arduino is connected
         button_pins (Union[np.ndarray, List[int]]): digital pins that are connected to buttons
         potentiometer_pins (Union[np.ndarray, List[int]]): analog pins that are connected to potentiometers, count should be the same as variables
         rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
         variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
-    Attributes:
-        _board (pyfirmata.Board): The microcontroller (arduino) board
-        _it (pyfirmata.Iterator): Iterator which updates pin values
     Raises:
-        InterfaceException: more variables than potentiometers, cant adjust each variable
+        InterfaceException: more variables than potentiometers + rotary_encoders, cant adjust each variable
         InterfaceException: Has less than two buttons.
-        SerialException from pyfirmata: Can't open serialport. Already in use or not plugged
     """
 
-    _board: Arduino
-    _it: util.Iterator
+    master: Master
     buttons: List[Button]
-    potentiometers: List[Potentiometer]
-    rotary_encoders: List[RotaryEncoder]
-    variable_bounds: Optional[np.ndarray]
+    problem: MOProblem
+    value_handlers: List[Union[Potentiometer, RotaryEncoder]]
 
     #Todo default values
     def __init__(
         self,
-        port: str,
+        master: Master,
+        problem: MOProblem,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = None, # [k][0] ideal_k, [k][1] nadir_k
     ):
-        if variable_bounds is not None:
-            if len(variable_bounds) > len(potentiometer_pins) + len(rotary_encoders_pins): # TODO move to validation when migrating to "texas"-model
-                raise InterfaceException(
-                    "Not enough potentiometers!"
-                )
-        if len(button_pins) < 3:
-            raise InterfaceException("A physical interface requires at least three buttons")
+        self.master = master
+        self.problem = problem
 
-        self._board = Arduino(port)
-        self._it = util.Iterator(self._board)
-        self._it.start()
+        # Map the pins to actual components. Move to master?
+        self.buttons = list(map(lambda pin: Button(self.master.board, pin), button_pins))
+        potentiometers = list(map(lambda pin: Potentiometer(self.master.board, pin), potentiometer_pins))
+        rotary_encoders = list(map(lambda pins: RotaryEncoder(self.master.board, pins), rotary_encoders_pins))
 
-        # Map the pins to actual components
-        self.buttons = list(map(lambda pin: Button(self._board, pin), button_pins))
-        self.potentiometers = list(
-            map(lambda pin: Potentiometer(self._board, pin), potentiometer_pins)
-        )
-        self.rotary_encoders = list(map(lambda pins: RotaryEncoder(self._board, pins), rotary_encoders_pins))
+        self.value_handlers = potentiometers + rotary_encoders
 
-        if variable_bounds is None:
-            k = len(potentiometer_pins)
-            self.variable_bounds = np.column_stack((np.zeros(k), np.ones(k))) # Ideal, nadir
-        else:
-            self.variable_bounds = variable_bounds
-            self.potentiometers = self.potentiometers[:len(variable_bounds)] # Cut off unneeded potentiometers
+        if (len(self.problem.variables) > len(self.value_handlers)): # ehh, i.e rmp doesn't need this check
+            raise InterfaceException("More variables than handlers")
     
     def print_over(self, to_print: str) -> None:
         print(to_print, end="\r")
@@ -100,10 +76,8 @@ class Interface:
             bool: true in confirmed, false if declined
         """
         if to_print is not None: print(to_print)
-        while True:
-            if self.buttons[0].click(): return True
-            if self.buttons[1].click(): return False
-    
+        return self.master.confirm()
+
     def choose_from(self, options: np.ndarray, index_start: int = 0) -> Tuple[int, object]:
         """
         Let the dm choose an option from a given list by scrolling through different options with buttons
@@ -122,32 +96,19 @@ class Interface:
         if (index_start < 0 or index_start > index_max):
             raise Exception("Starting index out of bounds")
 
-        print('\nChoose a desired option: red +1, yellow -1, green confirm')
-        current = index_start
-        self.print_over(f"Currently chosen {current}/{index_max}: {options[current]}")
+        self.master.wheel.current_value = index_start
 
-        while not self.buttons[0].click():
-            if self.buttons[1].click():
-                current = current +1 if current < index_max else 0
-            elif self.buttons[2].click():
-                current = current -1 if current > 0 else index_max
-            else: continue # Print only if either of the buttons have been clicked
-
+        while not self.master.confirm_button.click():
+            current = self.master.select(0, index_max)
             self.print_over(f"Currently chosen {current}/{index_max}: {options[current]}")
 
         print()
         return current, options[current]
     
     # in desdeo_emo/docs/notebooks/Example.ipynb one can choose multiple preferred values. Also in nimbus (saving solutions)
-    # Better implementation idea with the selection wheel:
-        # Display all solutions at once, where?
-        # highlight currently selected
-        # Green to select, red to remove, mark selected
-        # Hold the green button continue 
-        # OR scroll to some continue button (which could be highlighted when selected count is valid) and press it
     def choose_multiple(self, options: np.ndarray, min_options: int = 1, max_options: int = None) -> List[List]:
         if max_options is None:
-            max_options = len(options) # One can choose every option from the list
+            max_options = len(options) # choose all options from the list if wished so
         if max_options > len(options):
             raise Exception("Can't choose more options than available")
         
@@ -162,7 +123,7 @@ class Interface:
                 break
 
             if enough: # Don't ask for confirmation until min value reached
-                if not self.confirmation("If you wish to add a new solution click the green button, if not red"):
+                if not self.confirmation("If you wish to add a new solution click the confirm button, if not decline"):
                     break
             
             # TODO Clean up
@@ -174,9 +135,8 @@ class Interface:
 
         return selected_options
         
-
     
-    def choose_from_range(self, index_min: float = 0, index_max: float = 100, index_start: float = None, step: float = 1) -> float:
+    def choose_value(self, index_min: float = 0, index_max: float = 100, index_start: float = None, step: float = 1) -> float:
         """
         Let the dm choose an number from a given range 
         Args:
@@ -185,10 +145,7 @@ class Interface:
             index_start (float): The starting value, defaults to index_min
             step (float): the size of each step, defaults to 1
         Raises:
-            Exception: index_min is not lower than index_max
-            Exception: index_start is not a valid starting index. It is not between index_min and index_max
-            Exception: step size is not valid
-            Exception: starting index combined with step size is not valid
+            Exception: Some incompatibility with the given indexes and step size
         Returns:
             float: the value chosen
         """
@@ -210,85 +167,53 @@ class Interface:
         if ((index_max - index_start) % step != 0):
             raise Exception("Won't reach min or max values with selected starting value and step size")
 
-        print(f'\nChoose a desired option: red +{step}, yellow -{step}, green confirm')
-        current = index_start
-        self.print_over(f"Currently chosen {current}")
+        self.master.wheel.current_value = index_start
 
-        while not self.buttons[0].click():
-            if self.buttons[1].click():
-                current = current +step if current < index_max else index_min
-            elif self.buttons[2].click():
-                current = current -step if current > index_min else index_max
-            else: continue # Print only if either of the buttons have been clicked
-
+        while not self.master.confirm_button.click():
+            current = self.master.select(index_min, index_max)
             self.print_over(f"Currently chosen {current}")
-
         print()
+
         return current
 
-    def get_potentiometer_value(self, value_name: str = "value", value_min: float = 0, value_max: float = 1, pot_index = 0) -> float:
-        if pot_index >= len(self.potentiometers) or pot_index < 0:
-            raise InterfaceException("invalid pot index")
-        print("\nPress the green button when you're ready")
-        while True:
-            value = self.potentiometers[0].get_value(value_min, value_max)
-            self.print_over(f"current {value_name}: {value}")
-            if self.buttons[0].click(): break
-        print("\n\n")
-        return value
+    # def get_potentiometer_value(self, value_name: str = "value", value_min: float = 0, value_max: float = 1, pot_index = 0) -> float:
+    #     if pot_index >= len(self.potentiometers) or pot_index < 0:
+    #         raise InterfaceException("invalid pot index")
+    #     print("\nPress the green button when you're ready")
+    #     while True:
+    #         value = self.potentiometers[0].get_value(value_min, value_max)
+    #         self.print_over(f"current {value_name}: {value}")
+    #         if self.buttons[0].click(): break
+    #     print("\n\n")
+    #     return value
     
-    def get_potentiometer_values(self, value_name: str = "values", value_min: float = 0, value_max: float = 1) -> np.array:
-        """
-        Display real time values from the pots to terminal and return the values when a button is pressed
-        Args:
-            value_name (str): Name of values. This will be printed to console and won't be necessary later on
-            value_min (float): min bound for all values
-            value_max (float): max bound for all values
-        Returns:
-            np.array: values chosen
-        """
-        print("\nPress the green button when you're ready")
+    def get_variable_value(self, variable):
+        bound_min, bound_max = variable.get_bounds()
+        index = self.problem.variables.index(variable)
+        return self.value_handlers[index].get_value(bound_min, bound_max)
+    
+    def get_variable_values(self):
         while True:
-            values = list(map(lambda pot: pot.get_value(value_min, value_max), self.potentiometers))
-            self.print_over(f"current {value_name}: {values}")
-            if self.buttons[0].click(): break
-        print("\n\n")
-        return np.array(values)
+            if self.master.confirm_button.click(): break
+            values = list(map(lambda var: self.get_variable_value(var), self.problem.variables))
+            self.print_over(values)
+        return values
 
-    def get_potentiometer_bounded_values(self, value_name: str = "values") -> np.array:
-        print("\nPress the green button when you're ready")
-        if self.variable_bounds is None:
-            return list(map(lambda pot: pot.get_value(), self.potentiometers))
+    def get_value(self, index: int, bounds: np.ndarray):
+        bound_min, bound_max = bounds
+        return self.value_handlers[index].get_value(bound_min, bound_max)
+    
+    def get_values(self, bounds: np.ndarray, int_values = False):
         while True:
+            if self.master.confirm_button.click(): break
             values = []
-            for pot in range(len(self.potentiometers)):
-                bound_min = self.variable_bounds[pot][0]
-                bound_max = self.variable_bounds[pot][1]
-                values.append(self.potentiometers[pot].get_value(bound_min, bound_max))
-            self.print_over(f"current {value_name}: {values}")
-            if self.buttons[0].click(): break
-        print()
-        return np.array(values)
-     
-    def get_potentiometer_values_int(self, value_name: str = "values", value_min: int = 0, value_max: int = 1) -> np.array:
-        print("\nPress the green button when you're ready")
-        while True:
-            values = list(map(lambda pot: pot.get_value_int(value_min, value_max), self.potentiometers))
-            self.print_over(f"current {value_name}: {values}")
-            if self.buttons[0].click(): break
-        print("\n\n")
-        return np.array(values)
+            for i in range(bounds.shape[1]):
+                value = self.get_value(i, bounds[:,i])
+                values.append(value)
+            self.print_over(values)
+        return values
 
-    # I'd maybe like to migrate every selection method to something this and get rid of the third button
-    def choose_with_wheel(self, options: np.ndarray) -> Any:
-        print("Press the confirm button when ready")
-        options_n = len(options)
-        while (True):
-            current_value = self.rotary_encoders[0].get_value(0, options_n, 1)
-            self.print_over(current_value)
-            if (self.buttons[0].click()): break
-        return current_value
-    
+
 
     # MAYBE
 
@@ -304,14 +229,12 @@ class Interface:
 
 # TODO mooooooore
 if __name__ == "__main__":
-    interface = Interface("COM3", button_pins=[2,3,4], potentiometer_pins = [0,1,2])
+    master = Master("COM3", 3,2,[8,9])
+    interface = Interface(master, variables=[],potentiometer_pins = [0,1,2])
 
     t = np.array([1,2,3,4,5,6,7])
     print(f"Select at least 2 values but no more than 4 from this array: {t}")
     t_chosen = interface.choose_multiple(t, 2, 4)
     print(f"You chose these values: {t_chosen}")
-
-    print("Choose a value between from 0-1500")
-    v = interface.get_potentiometer_value(value_min=0, value_max=1500)
     
 

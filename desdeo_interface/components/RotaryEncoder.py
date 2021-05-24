@@ -10,10 +10,8 @@ import time # For dynamic step sizes
 
 from typing import List
 
-
-# TODO fix delay
 class RotaryEncoder(Component):
-    current_value: float # Value of the encoder
+    _current_value: float # Value of the encoder
     #state: int # The position of the encoder, 1 or 0
     state_prev: int # the previous position of the encoder, 1 or 0
 
@@ -50,7 +48,7 @@ class RotaryEncoder(Component):
         pin0, pin1 = self.pin_values
 
         # if current state is different than prev state then rotary encoder has moved
-        if (pin0 != self.state_prev and pin0 == 1): 
+        if (pin0 != self.state_prev): # Add pin0 == 0 if crowtail 2.0 encoder else remove
             self.rotations.append(time.time()) # Add the rotation (time) to rotations list, needed for dynamic steps
             self.current_value += self._determine_direction(pin0, pin1) * step 
             # Make sure the values don't exceed bounds: Rather make them loop
@@ -98,7 +96,18 @@ class RotaryEncoder(Component):
     
     def update_rotations_list(self):
         # Filter out the rotations which happened more than a second ago
-        self.rotations = list(filter(lambda t: t > time.time() - 1, self.rotations)) 
+        current = time.time() - 1
+        self.rotations = list(filter(lambda t: t > current, self.rotations)) 
+    
+    @property
+    def current_value(self):
+        return self._current_value
+
+    @current_value.setter
+    def current_value(self, value: float):
+        self._current_value = value
+    
+    
         
 
 
@@ -110,9 +119,8 @@ if __name__ == "__main__":
     it = util.Iterator(board)
     it.start()
     rot_enc = RotaryEncoder(board, pins)
-    prev_value = rot_enc.current_value
+    print("Enter a value greater than 1000 to stop")
     while True:
         value = rot_enc.get_dynamic_value(step = 1)
-        if value != prev_value:
-            prev_value = value
-            print(value)
+        print(f"current value: {value}", end="\r")
+        if (value > 1000): break

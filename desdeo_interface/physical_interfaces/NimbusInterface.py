@@ -1,4 +1,5 @@
 import os, sys
+from desdeo_mcdm import interactive
 
 from numpy.core.fromnumeric import var
 from numpy.core.numeric import indices
@@ -8,9 +9,11 @@ sys.path.insert(1, p)
 from desdeo_interface.physical_interfaces.Interface import Interface
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
+from desdeo_interface.components.Master import Master
 from time import sleep
 import numpy as np
 from typing import Union, Optional, List, Tuple
+from desdeo_problem.Problem import MOProblem
 
 class NimbusInterface(Interface):
     """
@@ -25,41 +28,17 @@ class NimbusInterface(Interface):
 
     def __init__(
         self,
-        port: str,
+        master: Master,
+        problem: MOProblem,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = None,
     ):
-        super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
+        super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
     
-    def get_aspiration_level(self, min, max) -> float:
-        """
-        Get an aspiration level for an objective
-
-        Args:
-            min (float): Minimum value for the aspiration level
-            max (float): Maximum value for the aspiration level
-
-        Returns:
-            float: Chosen aspiration level
-        """
-        print(f"Specify an aspiration level for the objective")
-        return self.get_potentiometer_value(value_name="Aspiration level", value_min= min, value_max= max)
-
-    def get_upper_bound(self, min, max) -> float:
-        """
-        Get an upper bound for an objective
-
-        Args:
-            min (float): Minimum value for the bound
-            max (float): Maximum value for the bound
-
-        Returns:
-            float: Chosen upper bound
-        """
-        print(f"Specify a upper bound for the objective")
-        return self.get_potentiometer_value(value_name="Upper bound", value_min= min, value_max= max)
+    def get_levels(self):
+        print("Set aspiration levels or upper bounds")
+        return np.array(self.get_values(np.stack((self.problem.ideal, self.problem.nadir))))
     
     def get_classification(self) -> str:
         """
@@ -71,33 +50,22 @@ class NimbusInterface(Interface):
         classification_options = ["<", "<=", "=", ">=", "0"]
         return self.choose_from(classification_options)[1]
     
-    def get_classifications_and_levels(self, objective_count) -> Tuple[List[str], List[float]]:
+    # Maybe this could be with value handlers aswell
+    def get_classifications(self) -> List[str]:
         """
-        Choose a classification and levels for each objective 
-
-        Args:
-            objective_count (int): how many objectives to classificate
+        Choose a classification for each objective 
 
         Returns:
-            str: Chosen classification
+            List[str]: Chosen classifications
         """
         classifications = []
-        levels = []
+        objective_count = self.problem.n_of_objectives
         for obj_index in range(objective_count):
             print(f"Pick a classification level for objective at index {obj_index}")
             classification = self.get_classification()
-            if classification == "<=":
-                min, max = self.variable_bounds[obj_index]
-                level = self.get_aspiration_level(min, max)
-            elif classification == ">=":
-                min, max = self.variable_bounds[obj_index]
-                level = self.get_upper_bound(min, max)
-            else:
-                level = -1
-            levels.append(level)
             classifications.append(classification)
-            print(f"Current classifications and levels: {classifications} {levels}")
-        return classifications, levels
+        print(f"Chosen classifications: {classifications}")
+        return classifications
     
     def specify_solution_count(self):
         """
@@ -107,7 +75,7 @@ class NimbusInterface(Interface):
             int: The amount of solutions to be calculated
         """
         print("Select solution count")
-        return self.choose_from_range(1, 4)
+        return self.choose_value(1, 4)
     
     def pick_preferred_solution(self, solutions: np.ndarray):
         """
@@ -125,7 +93,7 @@ class NimbusInterface(Interface):
         Returns:
             bool: Whether or not to continue
         """
-        return self.confirmation("Continue, green yes, red no")
+        return self.confirmation("Continue?")
 
     def try_another_classification(self):
         """
@@ -134,7 +102,7 @@ class NimbusInterface(Interface):
         Returns:
             bool: Whether or not to change classifications
         """
-        return self.confirmation("Try another classification, green yes, red no")
+        return self.confirmation("Try another classification?")
     
     def show_different_alternatives(self):
         """
@@ -143,7 +111,7 @@ class NimbusInterface(Interface):
         Returns:
             bool: Whether or not to see different alternatives
         """
-        return self.confirmation("Show alternatives, green yes, red no")
+        return self.confirmation("Show alternatives?")
     
     def save_solutions(self, solutions):
         """
@@ -223,7 +191,8 @@ if __name__ == "__main__":
     ideal=np.array([-20, -12])
 
     problem = MOProblem(variables=varsl, objectives=[f1, f2], ideal=ideal, nadir=nadir)
-    interface = NimbusInterface("COM3", button_pins=[2,3,4], potentiometer_pins=[0,1,2], variable_bounds= np.column_stack((ideal, nadir)))
+    master = Master()
+    interface = NimbusInterface(master, problem, potentiometer_pins=[0,1,2])
 
     
     from desdeo_mcdm.utilities.solvers import solve_pareto_front_representation
@@ -247,8 +216,8 @@ if __name__ == "__main__":
 
     print(classification_request.content["message"]) # Divide objective functions
     
-    objective_count = len(problem.objectives)
-    classifications, levels = interface.get_classifications_and_levels(objective_count)
+    classifications = interface.get_classifications()
+    levels = interface.get_levels()
     solution_count = interface.specify_solution_count()
 
     response = {
@@ -301,7 +270,8 @@ if __name__ == "__main__":
         elif next_request == "classification":
             print(classification_request.content["message"])
             objective_count = len(problem.objectives)
-            classifications, levels = interface.get_classifications_and_levels(objective_count)
+            classifications = interface.get_classifications()
+            levels = interface.get_levels()
             solution_count = interface.specify_solution_count()
             response = {
                 "classifications": classifications,

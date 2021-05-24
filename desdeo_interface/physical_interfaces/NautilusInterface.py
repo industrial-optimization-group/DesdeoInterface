@@ -2,6 +2,8 @@ import os, sys
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 
+from desdeo_problem.Problem import MOProblem
+from desdeo_interface.components.Master import Master
 from desdeo_interface.physical_interfaces.Interface import Interface
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
@@ -26,13 +28,13 @@ class NautilusInterface(Interface):
 
     def __init__(
         self,
-        port: str,
+        master: Master,
+        problem: MOProblem,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = None,
     ):
-        super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
+        super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
     
     def get_iteration_count(self, index_start: int = 3) -> int:
         """
@@ -45,7 +47,7 @@ class NautilusInterface(Interface):
             int: Desired iteration count
         """
         print("\nSet a new iteration count")
-        return int(self.choose_from_range(index_min = 1, index_start = index_start))
+        return int(self.choose_value(index_min = 1, index_start = index_start))
     
     def step_back(self) -> bool:
         """
@@ -54,7 +56,7 @@ class NautilusInterface(Interface):
         Returns:
             bool: Whether or not to step back 
         """
-        return self.confirmation("\nDo you wish to step back? green yes, red no")
+        return self.confirmation("\nDo you wish to step back?")
     
     def short_step(self) -> bool:
         """
@@ -63,7 +65,7 @@ class NautilusInterface(Interface):
         Returns:
             bool: Whether or not to short step 
         """
-        return self.confirmation("\nshort step? green yes, red no")
+        return self.confirmation("\nshort step?")
     
     def use_previous_preference(self):
         """
@@ -72,7 +74,7 @@ class NautilusInterface(Interface):
         Returns:
             bool: Whether or not to use previous preference
         """
-        return self.confirmation("\nDo you wish to use previous preference? green yes, red no")
+        return self.confirmation("\nDo you wish to use previous preference?")
         
     def get_preference_method(self):
         """
@@ -81,10 +83,9 @@ class NautilusInterface(Interface):
         Returns:
             int: The desired preference method, where 1 is relative ranking and 2 is percentages
         """
-        print("\nSelect the method: green = relative_ranking, red = percentages")
-        while True:
-            if self.buttons[0].click(): return 1
-            if self.buttons[1].click(): return 2
+        print("\nSelect the method")
+        options = np.array(["Relative", "Percentages"])
+        return self.choose_from(options)[0] + 1
     
     def get_preference_info_relative_ranking(self):
         """
@@ -93,12 +94,14 @@ class NautilusInterface(Interface):
         Returns:
             List[int]: A list of relative rankings for each objective
         """
-        print("\nUse the potentiometers to set relative rankings to the objectives, green to confirm")
-        bound_max = len(self.potentiometers)
-        return self.get_potentiometer_values_int("rankings", 1, bound_max)
+        print("\nUse the variable handlers to set relative rankings to the objectives, green to confirm")
+        objective_count = self.problem.n_of_objectives
+        lower_bounds = np.array([1]*objective_count)
+        upper_bounds = np.array([objective_count]*objective_count)
+        bounds = np.stack((lower_bounds, upper_bounds)) 
+        return self.get_values(bounds) # TODO get integer values
     
-    # This would be much easier and cleaner with rotary encoder
-    # Also I'd like that each value could be adjusted at the same time, now we go one by one
+    # TODO sum of percentages = 100
     def get_preference_info_percentages(self):
         """
         Get percentages for objective preferences
@@ -106,17 +109,12 @@ class NautilusInterface(Interface):
         Returns:
             List[int]: A list of percentages for each objective
         """
-        print("\nUse the potentiometers to set percentages to the objectives, green to confirm")
-        n = len(self.potentiometers) # I'd rather get n from somewhere else
-        percentages = []
-        used_percentage = 0
-        for pot in range(n-1):
-            percentage = self.get_potentiometer_value(f"pot {pot}: percentage", 0, 100-used_percentage, pot)
-            used_percentage += percentage
-            percentages.append(percentage)
-        percentages.append(100-used_percentage) # Last one depends on the other selections
-        print(f"Chosen percentages: {percentages}")
-        return percentages
+        print("\nUse the variable handlers to set percentages to the objectives")
+        objective_count = self.problem.n_of_objectives
+        lower_bounds = np.array([0]*objective_count)
+        upper_bounds = np.array([100]*objective_count)
+        bounds = np.stack((lower_bounds, upper_bounds))
+        return self.get_values(bounds)
 
 
 #Testing
@@ -168,17 +166,16 @@ if __name__ == "__main__":
     bounds = np.stack((lower_bounds, upper_bounds))
     variables = variable_builder(var_names, initial_values, lower_bounds, upper_bounds)
 
-    # problem
-    prob = MOProblem(objectives=[obj1, obj2, obj3], variables=variables)  # objectives "seperately"
-
     ideal = np.array([-6.34, -3.44487179, -7.5])
     nadir = np.array([-4.751, -2.86054116, -0.32111111])
     print("Ideal: ", ideal)
     print("Nadir: ", nadir)
-
+    # problem
+    prob = MOProblem(objectives=[obj1, obj2, obj3], variables=variables, ideal=ideal, nadir=nadir)  # objectives "seperately"
 
     # Interface
-    interface = NautilusInterface("COM3", button_pins = [2,3,4], potentiometer_pins= [0,1,2], variable_bounds= np.column_stack((ideal, nadir)))
+    master = Master()
+    interface = NautilusInterface(master,prob, potentiometer_pins= [0,1,2])
 
     # start solving
     method = Nautilus(problem=prob, ideal=ideal, nadir=nadir)

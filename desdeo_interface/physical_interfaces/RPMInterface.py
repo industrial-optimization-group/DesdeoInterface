@@ -1,4 +1,7 @@
 import os, sys
+from desdeo_mcdm.interactive.ReferencePointMethod import RPMException
+from desdeo_problem.Variable import Variable
+from desdeo_problem.Problem import MOProblem
 
 from numpy.core.fromnumeric import var
 p = os.path.abspath('.')
@@ -7,6 +10,7 @@ sys.path.insert(1, p)
 from desdeo_interface.physical_interfaces.Interface import Interface
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
+from desdeo_interface.components.Master import Master
 from time import sleep
 import numpy as np
 from typing import Union, Optional, List
@@ -24,23 +28,24 @@ class RPMInterface(Interface):
 
     def __init__(
         self,
-        port: str,
+        master: Master,
+        problem: MOProblem,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-        variable_bounds: Optional[np.ndarray] = None,
     ):
-        super().__init__(port, button_pins, potentiometer_pins, rotary_encoders_pins, variable_bounds)
+        super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
+        if len(problem.objectives) > len(self.value_handlers):
+            raise RPMException("Not enough variable handlers")
 
 
-    def get_input(self) -> np.ndarray:
+    def get_referencepoint(self) -> np.ndarray:
         """
-        Get real time values from potentiometers and display them. Continue when the DM chooses to
-
+        Get a new referencepoint from the dm
         Returns:
             np.array: new reference point
-        """
-        return self.get_potentiometer_bounded_values("Reference point")
+        """ 
+        return np.array(self.get_values(np.stack((self.problem.ideal, self.problem.nadir))))
 
     def get_satisfaction(self) -> bool:
         """
@@ -61,11 +66,7 @@ class RPMInterface(Interface):
         Returns:
             int: Index of the desired solution
         """
-        print(
-            """Choose a desired solution by scrolling through the options by clicking the red button
-        when ready press the green button"""
-        )
-
+        print("Choose a desired solution")
         return self.choose_from(solutions)[0]
 
 
@@ -122,16 +123,17 @@ if __name__ == "__main__":
     bounds = np.stack((lower_bounds, upper_bounds))
     variables = variable_builder(var_names, initial_values, lower_bounds, upper_bounds)
 
-
-    # problem
-    prob = MOProblem(objectives=[obj1, obj2, obj3], variables=variables)  # objectives "seperately"
-
     # solved in Nautilus.py
     ideal = np.array([-6.34, -3.44487179, -7.5])
     nadir = np.array([-4.751, -2.86054116, -0.32111111])
 
+    # problem
+    prob = MOProblem(objectives=[obj1, obj2, obj3], variables=variables, ideal=ideal, nadir=nadir)  # objectives "seperately"
+
+
     # interface
-    interface = RPMInterface("COM3", button_pins=[2,3,4], potentiometer_pins= [0,1,2], variable_bounds= np.column_stack((ideal, nadir)))
+    master = Master("COM3", 3, 2 ,[8,9])
+    interface = RPMInterface(master, prob, potentiometer_pins= [0,1,2])
 
     # start solving
     method = ReferencePointMethod(problem=prob, ideal=ideal, nadir=nadir)
@@ -143,7 +145,7 @@ if __name__ == "__main__":
     print(f"ideal: {ideal}\n")
     
     req = method.start()
-    rp = interface.get_input()
+    rp = interface.get_referencepoint()
     req.response = {
         "reference_point": rp,
     }
@@ -160,7 +162,7 @@ if __name__ == "__main__":
     satisfied = interface.get_satisfaction()
     while not satisfied:
         step += 1
-        rp = rp = interface.get_input()
+        rp = rp = interface.get_referencepoint()
         req.response = {"reference_point": rp, "satisfied": False}
         req = method.iterate(req)
         print("\nStep number: ", method._h)
