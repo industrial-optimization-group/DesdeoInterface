@@ -1,6 +1,7 @@
 let connectButton = document.getElementById("connect");
 let statusDisplay = document.getElementById("status");
 let slider = document.getElementById("slider");
+let checkBox = document.getElementById("checkbox");
 decoder = new TextDecoder();
 let device;
 
@@ -13,8 +14,21 @@ async function loopRead() {
   try { //Simplify if possible
     const result = await device.transferIn(5, 64);
     const command = decoder.decode(result.data);
-    const val = parseInt(command.trim());
-    slider.value = val;
+    const val = command.trim();
+    if (val.includes("POT")) {
+      potValue = parseInt(val.substring(3));
+      slider.value = potValue;
+    }
+    else if (val.includes("BUT")) {
+      isDown = val.substring(3) == "DOWN";
+      if (isDown) {
+        checkBox.checked = true;
+      }
+      else {
+        checkBox.checked = false;
+      }
+    }
+
 
     loopRead()
   } catch (e) {
