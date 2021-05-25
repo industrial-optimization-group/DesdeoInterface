@@ -119,8 +119,8 @@ if __name__ == "__main__":
     it = util.Iterator(board)
     it.start()
     rot_enc = RotaryEncoder(board, pins)
-    print("Enter a value greater than 1000 to stop")
+    print("Enter a value greater than 100 to stop")
     while True:
         value = rot_enc.get_dynamic_value(step = 1)
         print(f"current value: {value}", end="\r")
-        if (value > 1000): break
+        if (value > 100): break

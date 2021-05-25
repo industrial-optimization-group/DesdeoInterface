@@ -1,13 +1,11 @@
 from pyfirmata import Board, Pin
 from typing import List
-
-import pyfirmata
 class Component:
     """
     A base class for component
 
     Args:
-        board (pyfirmata.Board): The board (Arduino) the component is connected
+        board (Board): The board (Arduino) the component is connected
         pins List[int]: The pins the component is connected to
 
     Raises:
@@ -53,10 +51,3 @@ class Component:
         """
         get_pin_value = lambda pin: pin.read() if pin.read() is not None else -1.0
         return list(map(get_pin_value, self.pins))
-
-    # TODO connect the component to a board
-    # Find the board
-    # Make the connection
-    # Let the board know of the connection
-    def connect_to_board(self, board):
-        return

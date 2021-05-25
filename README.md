@@ -3,8 +3,6 @@
 The arduino is loaded with standard firmata: found from arduino ide -> file -> examples -> firmata -> standard firmata
 
 ## Todo
-* Less noise with potentiometers
-    * Filtering
 * How to connect multiple arduinos together and get the input to python from each one nicely
 * Better dynamic steps with rotary encoder
 

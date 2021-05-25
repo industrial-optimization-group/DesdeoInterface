@@ -29,7 +29,6 @@ async function loopRead() {
       }
     }
 
-
     loopRead()
   } catch (e) {
     console.log('Error reading data', e);

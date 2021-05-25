@@ -6,7 +6,7 @@ from desdeo_interface.components.Component import Component
 from typing import List
 from pyfirmata import Board
 
-# TIP It helps with the noise a little if you add a capacitor to the pots
+
 class Potentiometer(Component):
     """
     A potentiometer class to handle input from a connected potentiometer
@@ -16,13 +16,12 @@ class Potentiometer(Component):
     Raises:
         Exception: analog pin doesn't exist on the arduino uno
     """
-
+    prev_value: float # Used for EMA filtering
 
     def __init__(self, board: Board, pin: int):
         super().__init__(board, [pin], False)
         self.prev_value = self.pin_values[0]
 
-    #todo int values, as arg and return? not needed?
     def get_value(self, min: float = 0, max: float = 1) -> float:
         """
         Reads the value of the analog pin the potentiometer is connected and scales it
@@ -37,6 +36,8 @@ class Potentiometer(Component):
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
         value_pin = self.pin_values[0]
+        value_pin = self.filter(value_pin)
+        self.prev_value = value_pin
         current_value = (value_pin * (max - min)) + min
         return round(current_value,3) # Temporary rounding so that printing looks somewhat decent
 
@@ -44,13 +45,19 @@ class Potentiometer(Component):
     def get_value_int(self, min: int = 0, max: int = 1) -> int: #inclusive
         return round(self.get_value(min, max))
 
-    #TODO test how it works when there are multiple pots, does it take long. Docs
-    def _get_mode_value(self, it: int = 10):
-        values = []
-        for i in range(it):
-            value = self.pin_values[0]
-            values.append(value)
-        return max(values, key = values.count) # return the mean
+    def filter(self, value: float) -> float:
+        """
+        Filter out changes in voltage from noise with
+        exponential moving average algorithm (EMA)
+
+        Args:
+            value (float): Value to be filtered
+        
+        Returns: 
+            float: Filtered value
+        """
+        a = 0.1 # Should be between 0 and 1
+        return (a * value) + ((1-a)*self.prev_value)
 
 
 # Simple testing for a potentiometer
@@ -62,7 +69,7 @@ if __name__ == "__main__":
         print(f"current value = {val}", end="\r")
 
     port = "COM3"  # Serial port the board is connected to
-    pin = 5  # Analog pin the potentiometer is connected to
+    pin = 2  # Analog pin the potentiometer is connected to
     board = Arduino(port)
     it = util.Iterator(board)
     it.start()
