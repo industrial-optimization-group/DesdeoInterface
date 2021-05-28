@@ -64,6 +64,7 @@ class Interface:
         if (len(self.problem.variables) > len(self.value_handlers)): # ehh, i.e rmp doesn't need this check
             raise InterfaceException("More variables than handlers")
     
+    # If to_print doesn't fit on one line then its just gonna print to a lot of lines
     def print_over(self, to_print: str) -> None:
         print(to_print, end="\r")
     

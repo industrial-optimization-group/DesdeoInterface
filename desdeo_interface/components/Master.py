@@ -4,7 +4,6 @@ sys.path.insert(1, p)
 
 import pyfirmata
 from pyfirmata import Arduino, util
-from pyfirmata.pyfirmata import Board
 from desdeo_interface.components.Component import Component
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.RotaryEncoder import RotaryEncoder
@@ -27,7 +26,7 @@ The master will then be passed to an interface class.
 class Master:
     """
     Attributes:
-        _board (pyfirmata.Board): The microcontroller (arduino) board
+        _board (Arduino): The microcontroller (arduino) board
         _it (pyfirmata.Iterator): Iterator which updates pin values
     """
     confirm_button: Button
@@ -77,8 +76,8 @@ class Master:
         for i in range(2, 15): # Check serial ports 2-15
             try: 
                 b = Arduino(f"COM{i}")
-                print(b.firmware)
-                if "Firmata" in b.firmware:
+                if b.firmware is not None and "Firmata" in b.firmware:
+                    print(f"Connected to board on port COM{i}")
                     return b
                 else: b.exit()
             except pyfirmata.serial.SerialException:
@@ -101,6 +100,7 @@ class Master:
 
 if __name__ == "__main__":
     master = Master() # Check connecting
+    master2 = Master()
     value = 0
     print("Select 15")
     while value != 15:

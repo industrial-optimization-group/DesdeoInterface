@@ -192,7 +192,7 @@ if __name__ == "__main__":
 
     problem = MOProblem(variables=varsl, objectives=[f1, f2], ideal=ideal, nadir=nadir)
     master = Master()
-    interface = NimbusInterface(master, problem, potentiometer_pins=[0,1,2])
+    interface = NimbusInterface(master, problem, potentiometer_pins=[0,1,2,3,4,5])
 
     
     from desdeo_mcdm.utilities.solvers import solve_pareto_front_representation
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     classification_request.response = response
 
     save_request, plot_request = method.iterate(classification_request)
-    next_request = "save" # TEMP
+    next_request = "save"
     while True:
         if next_request == "save": # Then we need to specify indices for later viewing
             print(save_request.content['message'])
