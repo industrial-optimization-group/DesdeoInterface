@@ -1,9 +1,12 @@
 #include <PJONSoftwareBitBang.h>
 #include <ArduinoJson.h>
-
+#include <RotaryEncoder.h>
 
 PJONSoftwareBitBang bus(0);
 StaticJsonDocument<512> doc; //512 is the RAM allocated to this document.
+
+int buttons[2] = {2, 3};
+RotaryEncoder rotEncoder = RotaryEncoder(8,9);
 
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info) {
   /* Make use of the payload before sending something, the buffer where payload points to is
@@ -39,10 +42,19 @@ void setup() {
   bus.strategy.set_pin(12);
   bus.begin();
   bus.set_receiver(receiver_function);
-
+  pinMode(buttons[0], INPUT);
+  pinMode(buttons[1], INPUT);
+  pinMode(rotaryencoder[0], INPUT);
+  pinMode(rotaryencoder[1], INPUT);
   Serial.begin(9600);
 };
 
 void loop() {
+  int bpin1 = digitalRead(buttons[0]);
+  int bpin2 = digitalRead(buttons[1]);
+  int rot[2] = {digitalRead(rotaryencoder[0]), digitalRead(rotaryencoder[1])};
+  doc["master"]["Accept"] = bpin1;
+  doc["master"]["Decline"] = bpin2;
+  doc["master"]["Rotary"] = rot[0];
   bus.receive(1000);
 };
