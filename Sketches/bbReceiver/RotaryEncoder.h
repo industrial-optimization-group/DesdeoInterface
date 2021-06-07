@@ -17,7 +17,7 @@ class RotaryEncoder
         int _pin0;
         int _pin1;
         int _prevState;
-        int Direction();
+        int Direction(int pin0, int pin1);
 };
 
 #endif
