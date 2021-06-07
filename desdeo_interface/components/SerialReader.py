@@ -52,12 +52,15 @@ class SerialReader:
 
 from desdeo_problem.Problem import MOProblem
 
+
 class InterFace:
     def __init__(self, problem: MOProblem = None, handle_objectives = False) -> None:
         self.ready = False
         self.problem = problem
         self.serial_reader = SerialReader()
+        self.master = {}
         self.targets = {}
+        # Maybe instansiate corresponding component and handle value modification with the instance
         self.construct(handle_objectives)
         self.updater = threading.Thread(target=self.update, daemon=True)
         self.updater.start()
@@ -70,7 +73,8 @@ class InterFace:
         while time.time() - now < 9:
             data = self.serial_reader.update()
         
-        master = data.pop('master')
+        master_data = data.pop('master')
+        self.update_master(master_data)
         values_to_handle = self.problem.objectives if handle_objectives else self.problem.variables
         p_count = len(data['P']) if 'P' in data else 0
         r_count = len(data['R']) if 'R' in data else 0
@@ -110,6 +114,8 @@ class InterFace:
         while True:
             if self.targets is None: break 
             new_data = self.serial_reader.update()
+            master_data = new_data.pop("master")
+            self.update_master(master_data)
             for target in self.targets.values():
                 component_type, node_id = target['node']
                 value = new_data[component_type][node_id]
@@ -121,7 +127,11 @@ class InterFace:
                     if value > u: value = u
                     if value < l: value = l
                 target["value"] = value
-
+    
+    def update_master(self, data):
+        self.master['accept'] = data['Accept']
+        self.master['decline'] = data['Decline']
+        self.master['value'] = data['Rotary']
 
 
 if __name__ == "__main__":
@@ -129,14 +139,32 @@ if __name__ == "__main__":
     def f1(xs):
         xs = np.atleast_2d(xs)
         return -xs[:, 0] - xs[:, 1] + 5
-    
+
+    def f2(xs):
+        xs = np.atleast_2d(xs)
+        return (1 / 5) * (
+            np.square(xs[:, 0])
+            - 10 * xs[:, 0]
+            + np.square(xs[:, 1])
+            - 4 * xs[:, 1]
+            + 11
+        )
+
+    def f3(xs):
+        xs = np.atleast_2d(xs)
+        return (5 - xs[:, 0]) * (xs[:, 1] - 11)
+
     obj1 = _ScalarObjective("obj1", f1)
-    objectives = [obj1]
+    obj2 = _ScalarObjective("obj2", f2)
+    obj3 = _ScalarObjective("obj3", f3)
+    objectives = [obj1, obj2, obj3]
+    objectives_n = len(objectives)
 
     # variables
     var_names = ["x1", "x2"]
-    initial_values = np.array([2, 3])
+    variables_n = len(var_names)
 
+    initial_values = np.array([2, 3])
     lower_bounds = [0, 0]
     upper_bounds = [4, 6]
     bounds = np.stack((lower_bounds, upper_bounds))
@@ -152,6 +180,7 @@ if __name__ == "__main__":
         pass
     try:
         while True:
+            print(m.master)
             for target in m.targets.items():
                 print(target)
             time.sleep(1) # Threading is bad :[

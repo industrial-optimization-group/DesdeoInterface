@@ -47,7 +47,7 @@ class RotaryEncoder(Component):
         
         pin0, pin1 = self.pin_values
         if pin0 is None or pin1 is None: self.current_value
-
+        
         # if current state is different than prev state then rotary encoder has moved
         if (pin0 != self.state_prev): # Add pin0 == 0 if crowtail 2.0 encoder else remove
             self.rotations.append(time.time()) # Add the rotation (time) to rotations list, needed for dynamic steps
