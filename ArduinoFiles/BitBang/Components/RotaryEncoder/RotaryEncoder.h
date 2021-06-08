@@ -11,13 +11,10 @@ class RotaryEncoder
 {
     public:
         RotaryEncoder(int pin1, int pin2);
-        int UpdateValue();
+        void getValues(uint8_t *arr);
     private:
-        int _value;
         int _pin0;
         int _pin1;
-        int _prevState;
-        int Direction();
 };
 
 #endif
