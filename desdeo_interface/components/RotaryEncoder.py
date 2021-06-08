@@ -20,11 +20,12 @@ class RotaryEncoder(Component):
     rotations: List[float] = [] # list of rotation start times
 
 
-    def __init__(self, board: Board, pins: List[int]):
-        if len(pins) != 2:
-            raise Exception("Rotary encoder needs 2 digital pins")
-        super().__init__(board, pins, True)
-        self.state_prev = self.pin_values[0] # Initial state
+    def __init__(self, board: Board = None, pins: List[int] = None):
+        # if len(pins) != 2:
+        #     raise Exception("Rotary encoder needs 2 digital pins")
+        # super().__init__(board, pins, True)
+        super().__init__()
+        self.state_prev = 0#self.pin_values[0] # Initial state
         self.current_value = 0
     
     # TODO Make it so that movements when not asked are not accounted for

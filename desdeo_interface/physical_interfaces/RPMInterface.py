@@ -28,13 +28,14 @@ class RPMInterface(Interface):
 
     def __init__(
         self,
-        master: Master,
+        #master: Master,
         problem: MOProblem,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
     ):
-        super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
+        #super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
+        super().__init__(problem)
         if len(problem.objectives) > len(self.value_handlers):
             raise RPMException("Not enough variable handlers")
 
@@ -132,8 +133,9 @@ if __name__ == "__main__":
 
 
     # interface
-    master = Master("COM3", 3, 2 ,[8,9])
-    interface = RPMInterface(master, prob, potentiometer_pins= [0,1,2])
+    # master = Master("COM3", 3, 2 ,[8,9])
+    # interface = RPMInterface(master, prob, potentiometer_pins= [0,1,2])
+    interface = RPMInterface(prob)
 
     # start solving
     method = ReferencePointMethod(problem=prob, ideal=ideal, nadir=nadir)

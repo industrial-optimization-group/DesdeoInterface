@@ -29,8 +29,9 @@ class Button(Component):
     """
     prev_value: bool = False
 
-    def __init__(self, board: Board, pin: int):
-        super().__init__(board, [pin], True)
+    def __init__(self, board: Board = None, pin: int = None):
+        # super().__init__(board, [pin], True)
+        super().__init__()
 
     # Todo function as parameter if needed, callback idea
     def click(self) -> bool:
@@ -104,6 +105,8 @@ class Button(Component):
             if self.click(): return Action.DOUBLE_CLICK
         
         return Action.CLICK
+
+
 
 
 # testing the button

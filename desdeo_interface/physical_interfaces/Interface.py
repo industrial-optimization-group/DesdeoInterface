@@ -11,9 +11,12 @@ from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
 from desdeo_interface.components.RotaryEncoder import RotaryEncoder
 from desdeo_interface.components.Component import Component
+from desdeo_interface.components.SerialReader import SerialReader
 
 from pyfirmata import Arduino, util
+import threading
 from time import sleep
+import time
 import numpy as np
 from typing import Union, Optional, List, Tuple, Any
 
@@ -45,24 +48,42 @@ class Interface:
     #Todo default values
     def __init__(
         self,
-        master: Master,
         problem: MOProblem,
+        master: Master = None,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
     ):
-        self.master = master
+        self.master = Master()
+        self.serial_reader = SerialReader()
+        self.problem = problem
+        self.targets = {}
+        # Maybe instansiate corresponding component and handle value modification with the instance
+        self.construct(True)
+        self.update(True)
+        self.updater = threading.Thread(target=self.update, daemon=True)
+        self.updater.start()
+
         self.problem = problem
 
+        self.value_handlers = [
+            target['component'] for target
+            in list(self.targets.values()) 
+            if target["node"][0] == "R"
+            or target["node"][0] == "P"
+        ]
+
+        print (self.value_handlers)
+ 
         # Map the pins to actual components. Move to master?
-        self.buttons = list(map(lambda pin: Button(self.master.board, pin), button_pins))
-        potentiometers = list(map(lambda pin: Potentiometer(self.master.board, pin), potentiometer_pins))
-        rotary_encoders = list(map(lambda pins: RotaryEncoder(self.master.board, pins), rotary_encoders_pins))
+        # self.buttons = list(map(lambda pin: Button(self.master.board, pin), button_pins))
+        # potentiometers = list(map(lambda pin: Potentiometer(self.master.board, pin), potentiometer_pins))
+        # rotary_encoders = list(map(lambda pins: RotaryEncoder(self.master.board, pins), rotary_encoders_pins))
 
-        self.value_handlers = potentiometers + rotary_encoders
+        # self.value_handlers = potentiometers + rotary_encoders
 
-        if (len(self.problem.variables) > len(self.value_handlers)): # ehh, i.e rmp doesn't need this check
-            raise InterfaceException("More variables than handlers")
+        # if (len(self.problem.variables) > len(self.value_handlers)): # ehh, i.e rmp doesn't need this check
+        #     raise InterfaceException("More variables than handlers")
     
     # If to_print doesn't fit on one line then its just gonna print to a lot of lines
     def print_over(self, to_print: str) -> None:
@@ -200,7 +221,7 @@ class Interface:
             self.print_over(values)
         return values
 
-    def get_value(self, index: int, bounds: np.ndarray):
+    def get_value_old(self, index: int, bounds: np.ndarray):
         bound_min, bound_max = bounds
         return self.value_handlers[index].get_value(bound_min, bound_max)
     
@@ -208,11 +229,90 @@ class Interface:
         while True:
             if self.master.confirm_button.click(): break
             values = []
-            for i in range(bounds.shape[1]):
-                value = self.get_value(i, bounds[:,i])
+            for target in self.targets:
+                i = list(self.targets).index(target)
+                value = self.get_value(target, bounds[:,i])
                 values.append(value)
             self.print_over(values)
         return values
+    
+    def construct(self, handle_objectives):
+        print("Constructing the interface... This will take about 10 seconds")
+        now = time.time()
+        # Make sure every component has send data over master and master has written to serial
+        while time.time() - now < 9:
+            data = self.serial_reader.update()
+        
+        master_data = data.pop('master')
+        self.update_master(master_data)
+        values_to_handle = self.problem.objectives if handle_objectives else self.problem.variables
+        p_count = len(data['P']) if 'P' in data else 0
+        r_count = len(data['R']) if 'R' in data else 0
+
+        if len(values_to_handle) > p_count + r_count:
+            raise Exception("Not enough handlers")
+        for component_type in data.keys():
+            for node_id in data[component_type].keys():
+                if len(values_to_handle) == 0: break
+                self.assign_component(component_type, node_id, values_to_handle)
+        print("succefully constructed the interface")
+        self.ready = True
+    
+    def assign_component(self, component_type, node_id, values_to_handle):
+        if component_type == "B":
+            print("Skipping button")
+            return
+        next = values_to_handle.pop() # doesnt work with vector objectives
+        if component_type == "P":
+            print(f"Adding a potentiometer to {next.name}")
+            comp = Potentiometer()
+        elif component_type == "R": 
+            print(f"Adding a rotary encoder to handle {next.name}")
+            comp = RotaryEncoder()
+        else: return
+        if isinstance(next, Variable):
+             lower, upper = next.get_bounds()
+        else:
+             lower = next.lower_bound
+             upper = next.upper_bound
+        self.targets[next.name] = {
+            'component': comp,
+            'node': (component_type, node_id),
+            'value': 0,
+            'lower_bound': lower,
+            'upper_bound': upper,
+        }
+    
+    def get_value(self, target_name, bounds):
+        bound_min, bound_max = bounds
+        return self.targets[target_name]['component'].get_value(bound_min, bound_max)
+        
+    def update(self, once: bool = False):
+        while True:
+            if self.targets is None: break 
+            new_data = self.serial_reader.update()
+            master_data = new_data.pop("master")
+            self.update_master(master_data)
+            for target in self.targets.values():
+                component_type, node_id = target['node']
+                value = new_data[component_type][node_id]
+                component = target["component"]
+                if isinstance(value, int): value = [value]
+                component.update(value)
+                # u = target["upper_bound"]
+                # l = target["lower_bound"]
+                # if component_type == "P":
+                #     value = np.interp(value, [0,1023], [l,u])
+                # else:
+                #     if value > u: value = u
+                #     if value < l: value = l
+                target["value"] = value
+            if once: break
+
+    def update_master(self, data):
+        self.master.confirm_button.update([data['Accept']])
+        self.master.decline_button.update([data['Decline']])
+        self.master.wheel.update(data['Rotary'])
 
 
 
@@ -230,12 +330,12 @@ class Interface:
 
 # TODO mooooooore
 if __name__ == "__main__":
-    master = Master("COM3", 3,2,[8,9])
-    interface = Interface(master, variables=[],potentiometer_pins = [0,1,2])
-
-    t = np.array([1,2,3,4,5,6,7])
-    print(f"Select at least 2 values but no more than 4 from this array: {t}")
-    t_chosen = interface.choose_multiple(t, 2, 4)
-    print(f"You chose these values: {t_chosen}")
+    pass
+    # master = Master("COM3", 3,2,[8,9])
+    # interface = Interface(master, variables=[],potentiometer_pins = [0,1,2])
+    # t = np.array([1,2,3,4,5,6,7])
+    # print(f"Select at least 2 values but no more than 4 from this array: {t}")
+    # t_chosen = interface.choose_multiple(t, 2, 4)
+    # print(f"You chose these values: {t_chosen}")
     
 

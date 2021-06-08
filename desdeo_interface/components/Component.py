@@ -13,16 +13,20 @@ class Component:
     """
 
     pins: List[Pin]
+    _pin_values: List[int]
 
-    def __init__(self, board: Board, pins: List[int], is_digital: bool):
-        if is_digital:
-            if not self._validate_pins(pins, 2, 13):
-                raise Exception("Pin is invalid, should be in the range on 2-13")
-            self.pins = list(map(lambda pin: board.get_pin(f'd:{pin}:i'), pins))
-        else: #Is analog
-            if not self._validate_pins(pins, 0, 6):
-                raise Exception("Pin is invalid, should be in the range on 0-5")
-            self.pins = list(map(lambda pin: board.get_pin(f'a:{pin}:i'), pins))
+    #def __init__(self, board: Board, pins: List[int], is_digital: bool):
+        # if is_digital:
+        #     if not self._validate_pins(pins, 2, 13):
+        #         raise Exception("Pin is invalid, should be in the range on 2-13")
+        #     self.pins = list(map(lambda pin: board.get_pin(f'd:{pin}:i'), pins))
+        # else: #Is analog
+        #     if not self._validate_pins(pins, 0, 6):
+        #         raise Exception("Pin is invalid, should be in the range on 0-5")
+        #     self.pins = list(map(lambda pin: board.get_pin(f'a:{pin}:i'), pins))
+    def __init__(self) -> None:
+        self._pin_values = None
+        pass
     
     @staticmethod
     def _validate_pins(pins: List[int], min: int, max: int) -> bool:
@@ -49,5 +53,9 @@ class Component:
         Returns:
             list[float]: value of each pin which is between 0.0 - 1.0 or -1.0 if pin is unavailable
         """
+        return self._pin_values
         get_pin_value = lambda pin: pin.read() if pin.read() is not None else -1.0
         return list(map(get_pin_value, self.pins))
+    
+    def update(self, pin_values: List[int]):
+        self._pin_values = pin_values

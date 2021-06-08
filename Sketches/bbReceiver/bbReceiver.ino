@@ -4,9 +4,10 @@
 
 PJONSoftwareBitBang bus(0);
 StaticJsonDocument<512> doc; //512 is the RAM allocated to this document.
-
+JsonArray rotary = doc["master"].createNestedArray("Rotary");
 int buttons[2] = {2, 3};
-RotaryEncoder rotEncoder = RotaryEncoder(8,9);
+//RotaryEncoder rotEncoder = RotaryEncoder(8,9);
+int rotaryEncoder[2] = {8,9};
 
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info) {
   /* Make use of the payload before sending something, the buffer where payload points to is
@@ -50,8 +51,14 @@ void setup() {
 void loop() {
   int bpin1 = digitalRead(buttons[0]);
   int bpin2 = digitalRead(buttons[1]);
+  
+  int rot1 = digitalRead(rotaryEncoder[0]);
+  int rot2 = digitalRead(rotaryEncoder[1]);
+
+  rotary[0] = rot1;
+  rotary[1] = rot2;
+
   doc["master"]["Accept"] = bpin1;
   doc["master"]["Decline"] = bpin2;
-  doc["master"]["Rotary"] = rotEncoder.UpdateValue();
   bus.receive(1000);
 };

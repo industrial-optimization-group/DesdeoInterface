@@ -1,3 +1,6 @@
+from desdeo_interface.components.RotaryEncoder import RotaryEncoder
+from desdeo_interface.components.Potentiometer import Potentiometer
+from desdeo_interface.components.Master import Master
 from desdeo_problem.Variable import Variable
 import serial
 from serial.serialutil import SerialException
@@ -58,7 +61,7 @@ class InterFace:
         self.ready = False
         self.problem = problem
         self.serial_reader = SerialReader()
-        self.master = {}
+        self.master = Master()
         self.targets = {}
         # Maybe instansiate corresponding component and handle value modification with the instance
         self.construct(handle_objectives)
@@ -93,18 +96,24 @@ class InterFace:
             print("Skipping button")
             return
         next = values_to_handle.pop() # doesnt work with vector objectives
-        if component_type == "P": print(f"Adding a potentiometer to {next.name}")
-        if component_type == "R": print(f"Adding a rotary encoder to handle {next.name}")
-        if isinstance(next, Variable):
-            lower, upper = next.get_bounds()
-        else:
-            lower = next.lower_bound
-            upper = next.upper_bound
+        if component_type == "P":
+            print(f"Adding a potentiometer to {next.name}")
+            comp = Potentiometer()
+        elif component_type == "R": 
+            print(f"Adding a rotary encoder to handle {next.name}")
+            comp = RotaryEncoder()
+        else: return
+        # if isinstance(next, Variable):
+        #     lower, upper = next.get_bounds()
+        # else:
+        #     lower = next.lower_bound
+        #     upper = next.upper_bound
         self.targets[next.name] = {
+            'component': comp,
             'node': (component_type, node_id),
             'value': 0,
-            'lower_bound': lower,
-            'upper_bound': upper,
+            # 'lower_bound': lower,
+            # 'upper_bound': upper,
         }
     
     def get_value(self, target_name):
@@ -119,19 +128,25 @@ class InterFace:
             for target in self.targets.values():
                 component_type, node_id = target['node']
                 value = new_data[component_type][node_id]
-                u = target["upper_bound"]
-                l = target["lower_bound"]
-                if component_type == "P":
-                    value = np.interp(value, [0,1023], [l,u])
-                else:
-                    if value > u: value = u
-                    if value < l: value = l
+                component = target["component"]
+                component.update(value)
+                # u = target["upper_bound"]
+                # l = target["lower_bound"]
+                # if component_type == "P":
+                #     value = np.interp(value, [0,1023], [l,u])
+                # else:
+                #     if value > u: value = u
+                #     if value < l: value = l
                 target["value"] = value
+
     
     def update_master(self, data):
-        self.master['accept'] = data['Accept']
-        self.master['decline'] = data['Decline']
-        self.master['value'] = data['Rotary']
+        self.master.accept_button.update(data['Accept'])
+        self.master.decline_button.update(data['Decline'])
+        self.master.wheel.update(data['Rotary'])
+        # self.master['accept'] = data['Accept']
+        # self.master['decline'] = data['Decline']
+        # self.master['value'] = data['Rotary']
 
 
 if __name__ == "__main__":

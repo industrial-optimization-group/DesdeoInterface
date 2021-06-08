@@ -5,7 +5,7 @@ sys.path.insert(1, p)
 from desdeo_interface.components.Component import Component
 from typing import List
 from pyfirmata import Board
-
+import numpy as np
 
 class Potentiometer(Component):
     """
@@ -18,9 +18,10 @@ class Potentiometer(Component):
     """
     prev_value: float # Used for EMA filtering
 
-    def __init__(self, board: Board, pin: int):
-        super().__init__(board, [pin], False)
-        self.prev_value = self.pin_values[0]
+    def __init__(self, board: Board = None, pin: int = None):
+        #super().__init__(board, [pin], False)
+        super().__init__()
+        self.prev_value = 0 #self.pin_values[0]
 
     def get_value(self, min: float = 0, max: float = 1) -> float:
         """
@@ -35,11 +36,11 @@ class Potentiometer(Component):
         """
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
-        value_pin = self.pin_values[0]
+        value_pin = self.pin_values[0] / 1023
         value_pin = self.filter(value_pin)
         self.prev_value = value_pin
         current_value = (value_pin * (max - min)) + min
-        return round(current_value,3) # Temporary rounding so that printing looks somewhat decent
+        return round(current_value, 3) # Temporary rounding so that printing looks somewhat decent
 
     #TODO documentation
     def get_value_int(self, min: int = 0, max: int = 1) -> int: #inclusive
