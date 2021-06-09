@@ -5,18 +5,19 @@ Potentiometer.h - Library for getting input from a potentiometer
 #ifndef Potentiometer_h
 #define Potentiometer_h
 
+#include "Component.h"
 #include "Arduino.h"
 
-class Potentiometer
+class Potentiometer: public Component
 {
 public:
-    Potentiometer(int analogPin);
+    Potentiometer() {}
+    Potentiometer(int analogPin, uint8_t id);
     uint16_t getValue();
 
 private:
     uint16_t filter(uint16_t value);
     int _pin;
-    uint16_t _prevValue;
 };
 
 #endif

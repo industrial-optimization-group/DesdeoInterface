@@ -12,23 +12,28 @@ int rotaryEncoder[2] = {8,9};
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info) {
   /* Make use of the payload before sending something, the buffer where payload points to is
      overwritten when a new message is dispatched */
+      Serial.println("RE");
+
     String type;
-    type += char(payload[0]);
-    uint8_t id = (uint8_t)(payload[1]);
+    uint8_t id = (uint8_t)(payload[0]);
+    type +=char(payload[1]);
+    uint8_t componentId = (uint8_t)(payload[2]);
+
     if (type == "B") {
-      uint16_t value = (uint16_t)(payload[2]);
-      doc[type][String(id)] = value;
+      uint16_t value = (uint16_t)(payload[3]);
+      doc[String(id)][type][String(componentId)] = value;
     }
     else if (type == "P") {
-      uint16_t value = ((uint16_t)(payload[2] << 8) | (uint16_t)(payload[3] & 0xFF));
-      doc[type][String(id)] = value;
+      uint16_t value = ((uint16_t)(payload[3] << 8) | (uint16_t)(payload[4] & 0xFF));
+      doc[String(id)][type][String(componentId)] = value;
     }
     else if (type == "R") {
       JsonArray slaveRotary = doc[type][String(id)] ;
-      if (slaveRotary.isNull()) {slaveRotary = doc[type].createNestedArray(String(id));}
-      slaveRotary[0] = payload[2];
-      slaveRotary[1] = payload[3];
+      if (slaveRotary.isNull()) {slaveRotary = doc[String(id)][type].createNestedArray(String(componentId));}
+      slaveRotary[0] = payload[3];
+      slaveRotary[1] = payload[4];
     }
+    else {return;}
     serializeJson(doc, Serial);
     Serial.println();
 };

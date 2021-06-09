@@ -1,16 +1,18 @@
 /*
-asd
+RotaryEncoder.h - Library for Rotary Encoders
 */
 
 #ifndef RotaryEncoder_h
 #define RotaryEncoder_h
 
 #include "Arduino.h"
+#include "Component.h"
 
-class RotaryEncoder
+class RotaryEncoder: public Component
 {
     public:
-        RotaryEncoder(int pin1, int pin2);
+        RotaryEncoder() {}
+        RotaryEncoder(int pin1, int pin2, uint8_t id);
         void getValues(uint8_t *arr);
     private:
         int _pin0;

@@ -1,5 +1,5 @@
 #include <RotaryEncoder.h>
-
+#include <Slave.h>
 #include <PJONSoftwareBitBang.h>
 
 uint8_t id = 251; // Make sure each node has different id
@@ -15,6 +15,6 @@ void setup() {
 void loop() {
     uint8_t values[2];
     rot.getValues(values);
-    uint8_t pContent[4] = {'R', id, values[0], values[0]};
+    uint8_t pContent[4] = {'R', id, values[0], values[1]};
     bus.send_packet(0, pContent, 4);
 };
