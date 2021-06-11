@@ -53,31 +53,6 @@ class Master:
     
     def select(self, min, max):
         return self.wheel.get_value(min, max, 1)
-    
-    # Is this fine?
-    # def _find_board(self) -> Arduino:
-    #     """
-    #     Looks for an arduino board with 
-    #     pyfirmata firmware in it connected to a
-    #     serial port
-
-    #     Returns:
-    #         Arduino: First, as in lowest serial port index,
-    #         connected arduino board with pyfirmata firmware
-        
-    #     Throws:
-    #         Exception: If no board was found
-    #     """
-    #     for i in range(2, 15): # Check serial ports 2-15
-    #         try: 
-    #             b = Arduino(f"COM{i}")
-    #             if b.firmware is not None and "Firmata" in b.firmware:
-    #                 print(f"Connected to board on port COM{i}")
-    #                 return b
-    #             else: b.exit()
-    #         except pyfirmata.serial.SerialException:
-    #             pass
-    #     raise Exception("No board found")
  
     @property
     def board(self):

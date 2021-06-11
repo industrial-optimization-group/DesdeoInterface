@@ -14,10 +14,43 @@ from desdeo_problem import variable_builder
 
 class SerialReader:
     def __init__(self) -> None:
+        self._data = {}
         ports = self.find("Arduino Uno")
         if len(ports) == 0:
             raise Exception("Couldn't find a usable board")
         self.uno = self.get(ports)
+    
+    def crc_check(self, data, key) -> bool:
+        def xor(a, b):
+            result = []
+            for i in range(1, len(b)):
+                if a[i] == b[i]:
+                    result.append('0')
+                else:
+                    result.append('1')
+            return ''.join(result)
+   
+
+        def mod2div(a, b):
+            p = len(b)
+            tmp = a[0: p]
+            while p < len(a):
+                if tmp[0] == '1':
+                    tmp = xor(b, tmp) + a[p]
+                else:
+                    tmp = xor('0'*p, tmp) + a[p]
+                p += 1
+            
+            if tmp[0] == '1':
+                tmp = xor(b, tmp)
+            else:
+                tmp = xor('0'*p, tmp)
+            
+            return tmp
+
+        k = len(key)
+        new_data = data + '0'* (k-1) # Add zeros to data
+        return mod2div(new_data, key) == '0' * k-1
 
     def read(self, port):
         r = port.readline()[:-2] # Remove \r\n
@@ -48,9 +81,15 @@ class SerialReader:
     def update(self):
         d = self.read(self.uno)
         if d:
-            dict_str = d.decode("UTF-8")
-            data = ast.literal_eval(dict_str)
-            return data
+            try:
+                dict_str = d.decode("UTF-8")
+                data = ast.literal_eval(dict_str)
+                if data is not None:
+                    self._data = data
+                return self._data
+            except Exception as e:
+                print("Couldn't parse data")
+                print(f"got exception {e}")
 
 
 from desdeo_problem.Problem import MOProblem

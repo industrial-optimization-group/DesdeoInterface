@@ -1,11 +1,11 @@
 import os, sys
+p = os.path.abspath('.')
+sys.path.insert(1, p)
+
 from desdeo_mcdm.interactive.ReferencePointMethod import RPMException
 from desdeo_problem.Variable import Variable
 from desdeo_problem.Problem import MOProblem
 
-from numpy.core.fromnumeric import var
-p = os.path.abspath('.')
-sys.path.insert(1, p)
 
 from desdeo_interface.physical_interfaces.Interface import Interface
 from desdeo_interface.components.Button import Button

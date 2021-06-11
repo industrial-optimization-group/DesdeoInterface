@@ -1,19 +1,15 @@
-from desdeo_problem.Variable import Variable
-
 import os, sys
-
-from numpy.core.fromnumeric import var
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 from desdeo_interface.components.Master import Master
-from desdeo_problem.Problem import MOProblem
 from desdeo_interface.components.Button import Button
 from desdeo_interface.components.Potentiometer import Potentiometer
 from desdeo_interface.components.RotaryEncoder import RotaryEncoder
 from desdeo_interface.components.Component import Component
 from desdeo_interface.components.SerialReader import SerialReader
 
-from pyfirmata import Arduino, util
+from desdeo_problem.Variable import Variable
+from desdeo_problem.Problem import MOProblem
 import threading
 from time import sleep
 import time
@@ -239,26 +235,30 @@ class Interface:
     def construct(self, handle_objectives):
         print("Constructing the interface... This will take about 10 seconds")
         now = time.time()
-        # Make sure every component has send data over master and master has written to serial
+        # Make sure each node has send data to master
+        data = None
         while time.time() - now < 9:
-            data = self.serial_reader.update()
-        
+            new_data = self.serial_reader.update()
+            data = data if new_data is None else new_data
+    
         master_data = data.pop('master')
         self.update_master(master_data)
         values_to_handle = self.problem.objectives if handle_objectives else self.problem.variables
-        p_count = len(data['P']) if 'P' in data else 0
-        r_count = len(data['R']) if 'R' in data else 0
+
+        p_count = sum([len(node['P']) for node in data.values() if 'P' in node])
+        r_count = sum([len(node['R']) for node in data.values() if 'R' in node])
 
         if len(values_to_handle) > p_count + r_count:
             raise Exception("Not enough handlers")
-        for component_type in data.keys():
-            for node_id in data[component_type].keys():
-                if len(values_to_handle) == 0: break
-                self.assign_component(component_type, node_id, values_to_handle)
+        for node_id in data.keys():
+            for component_type in data[node_id].keys():
+                for component_id in data[node_id][component_type].keys():
+                    if len(values_to_handle) == 0: break
+                    self.assign_component(node_id, component_type, component_id, values_to_handle)
         print("succefully constructed the interface")
         self.ready = True
     
-    def assign_component(self, component_type, node_id, values_to_handle):
+    def assign_component(self, node_id, component_type, component_id, values_to_handle):
         if component_type == "B":
             print("Skipping button")
             return
@@ -277,7 +277,8 @@ class Interface:
              upper = next.upper_bound
         self.targets[next.name] = {
             'component': comp,
-            'node': (component_type, node_id),
+            'component_info': (component_type, component_id),
+            'node': node_id,
             'value': 0,
             'lower_bound': lower,
             'upper_bound': upper,
@@ -290,12 +291,15 @@ class Interface:
     def update(self, once: bool = False):
         while True:
             if self.targets is None: break 
-            new_data = self.serial_reader.update()
+            new_data = None
+            while new_data is None:
+                new_data = self.serial_reader.update()
             master_data = new_data.pop("master")
             self.update_master(master_data)
             for target in self.targets.values():
-                component_type, node_id = target['node']
-                value = new_data[component_type][node_id]
+                node_id = target['node']
+                component_type, component_id = target['component_info']
+                value = new_data[node_id][component_type][component_id]
                 component = target["component"]
                 if isinstance(value, int): value = [value]
                 component.update(value)

@@ -18,6 +18,7 @@ public:
 private:
     uint16_t filter(uint16_t value);
     int _pin;
+    
 };
 
 #endif

@@ -1,19 +1,30 @@
-#include "RotaryEncoder.h"
+#include <Potentiometer.h>
+#include <Button.h>
+#include <RotaryEncoder.h>
 #include <PJONSoftwareBitBang.h>
 #include <ArduinoJson.h>
 
 PJONSoftwareBitBang bus(0);
 StaticJsonDocument<512> doc; //512 is the RAM allocated to this document.
 JsonArray rotary = doc["master"].createNestedArray("Rotary");
-int buttons[2] = {2, 3};
-//RotaryEncoder rotEncoder = RotaryEncoder(8,9);
-int rotaryEncoder[2] = {8,9};
+
+const int communicationPin = 12;
+const int outputPin = 11;
+const int inputPin = 12;
+
+unsigned long startMillis;
+unsigned long currentMillis;
+
+// Make a own class for all component making and checking
+// Modulemaker or something
+
+// Have this serial sending as it's own class also
+
+// 'Trick' the master to think the components connected to it are coming from a module
+Button buttons[2] = {Button(2,0), Button(3,1)};
+RotaryEncoder rotEncoder = RotaryEncoder(8,9,0);
 
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info) {
-  /* Make use of the payload before sending something, the buffer where payload points to is
-     overwritten when a new message is dispatched */
-      Serial.println("RE");
-
     String type;
     uint8_t id = (uint8_t)(payload[0]);
     type +=char(payload[1]);
@@ -34,30 +45,44 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
       slaveRotary[1] = payload[4];
     }
     else {return;}
-    serializeJson(doc, Serial);
-    Serial.println();
+//    writeJsonToSerial();
+//    uint8_t nodeComponentCount[1] = {getComponentCount(id)};
+//    bus.send_packet(id, nodeComponentCount, 1);
+    writeJsonToSerial();
 };
 
+void writeJsonToSerial(){
+   serializeJson(doc, Serial);
+   Serial.println();
+}
+
+uint8_t getComponentCount(int id) {
+    uint8_t componentCount = 0;
+    JsonObject node = doc[String(id)].as<JsonObject>();
+    for (JsonPair kv : node) {
+      String compType = kv.key().c_str();
+      componentCount += doc[String(id)][compType].size();
+    }
+    return componentCount;
+}
+
 void setup() {
-  bus.strategy.set_pin(12);
+  Serial.begin(9600);
+  while (!Serial) {;}
+  bus.strategy.set_pins(12, 11);
   bus.begin();
   bus.set_receiver(receiver_function);
-  pinMode(buttons[0], INPUT);
-  pinMode(buttons[1], INPUT);
-  Serial.begin(9600);
+  startMillis = millis();
 };
 
 void loop() {
-  int bpin1 = digitalRead(buttons[0]);
-  int bpin2 = digitalRead(buttons[1]);
-  
-  int rot1 = digitalRead(rotaryEncoder[0]);
-  int rot2 = digitalRead(rotaryEncoder[1]);
+  uint8_t values[2];
+  rotEncoder.getValues(values);
+  rotary[0] = values[0];
+  rotary[1] = values[1];
 
-  rotary[0] = rot1;
-  rotary[1] = rot2;
-
-  doc["master"]["Accept"] = bpin1;
-  doc["master"]["Decline"] = bpin2;
+  doc["master"]["Accept"] = buttons[0].getValue();
+  doc["master"]["Decline"] = buttons[1].getValue();
+  if (rotEncoder.hasChanged() || buttons[0].hasChanged() || buttons[1].hasChanged()) { writeJsonToSerial(); }
   bus.receive(1000);
 };
