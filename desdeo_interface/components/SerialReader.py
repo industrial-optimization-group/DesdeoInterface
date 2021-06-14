@@ -1,60 +1,38 @@
-from desdeo_interface.components.RotaryEncoder import RotaryEncoder
-from desdeo_interface.components.Potentiometer import Potentiometer
-from desdeo_interface.components.Master import Master
-from desdeo_problem.Variable import Variable
 import serial
 from serial.serialutil import SerialException
 import serial.tools.list_ports
 import ast
-import threading # Threading allows python to execute other code while waiting
-import time
 import numpy as np
-from desdeo_problem.Objective import _ScalarObjective
-from desdeo_problem import variable_builder
 
 class SerialReader:
-    def __init__(self) -> None:
+    def __init__(self, crc_key: np.uint8 = 7) -> None:
         self._data = {}
         ports = self.find("Arduino Uno")
         if len(ports) == 0:
             raise Exception("Couldn't find a usable board")
-        self.uno = self.get(ports)
+        self._port = self.get(ports)
+        self.crc_lookup_table = self.create_lookup_table(crc_key)
     
-    def crc_check(self, data, key) -> bool:
-        def xor(a, b):
-            result = []
-            for i in range(1, len(b)):
-                if a[i] == b[i]:
-                    result.append('0')
+    def create_lookup_table(self, key: np.uint8):
+        table = []
+        for i in range(256):
+            cur: np.uint8 = i
+            for _ in range(8):
+                if (np.bitwise_and(cur, 0x80)) != 0:
+                    cur = np.left_shift(cur, 1) % 256
+                    cur = np.bitwise_xor(cur, key)
                 else:
-                    result.append('1')
-            return ''.join(result)
-   
+                    cur = np.left_shift(cur, 1) % 256
+            table.append(cur)
+        return table
 
-        def mod2div(a, b):
-            p = len(b)
-            tmp = a[0: p]
-            while p < len(a):
-                if tmp[0] == '1':
-                    tmp = xor(b, tmp) + a[p]
-                else:
-                    tmp = xor('0'*p, tmp) + a[p]
-                p += 1
-            
-            if tmp[0] == '1':
-                tmp = xor(b, tmp)
-            else:
-                tmp = xor('0'*p, tmp)
-            
-            return tmp
-
-        k = len(key)
-        new_data = data + '0'* (k-1) # Add zeros to data
-        return mod2div(new_data, key) == '0' * k-1
-
-    def read(self, port):
-        r = port.readline()[:-2] # Remove \r\n
-        return r if len(r) > 0 else None
+    def crc_check(self, data: str, crc: np.uint8) -> bool:
+        remainder = 0
+        data_arr = [ord(s) for s in data] + [crc]
+        for d in data_arr:
+            remainder = self.crc_lookup_table[d ^ remainder]
+        print(remainder)
+        return remainder == 0
 
     def find(self, s):
         ports = serial.tools.list_ports.comports()
@@ -79,167 +57,26 @@ class SerialReader:
         raise Exception("No available boards")
     
     def update(self):
-        d = self.read(self.uno)
-        if d:
-            try:
-                dict_str = d.decode("UTF-8")
-                data = ast.literal_eval(dict_str)
-                if data is not None:
-                    self._data = data
-                return self._data
-            except Exception as e:
-                print("Couldn't parse data")
-                print(f"got exception {e}")
-
-
-from desdeo_problem.Problem import MOProblem
-
-
-class InterFace:
-    def __init__(self, problem: MOProblem = None, handle_objectives = False) -> None:
-        self.ready = False
-        self.problem = problem
-        self.serial_reader = SerialReader()
-        self.master = Master()
-        self.targets = {}
-        # Maybe instansiate corresponding component and handle value modification with the instance
-        self.construct(handle_objectives)
-        self.updater = threading.Thread(target=self.update, daemon=True)
-        self.updater.start()
-
-    
-    def construct(self, handle_objectives):
-        print("Constructing the interface... This will take about 10 seconds")
-        now = time.time()
-        # Make sure every component has send data over master and master has written to serial
-        while time.time() - now < 9:
-            data = self.serial_reader.update()
-        
-        master_data = data.pop('master')
-        self.update_master(master_data)
-        values_to_handle = self.problem.objectives if handle_objectives else self.problem.variables
-        p_count = len(data['P']) if 'P' in data else 0
-        r_count = len(data['R']) if 'R' in data else 0
-
-        if len(values_to_handle) > p_count + r_count:
-            raise Exception("Not enough handlers")
-        for component_type in data.keys():
-            for node_id in data[component_type].keys():
-                if len(values_to_handle) == 0: break
-                self.assign_component(component_type, node_id, values_to_handle)
-        print("succefully constructed the interface")
-        self.ready = True
-    
-    def assign_component(self, component_type, node_id, values_to_handle):
-        if component_type == "B":
-            print("Skipping button")
-            return
-        next = values_to_handle.pop() # doesnt work with vector objectives
-        if component_type == "P":
-            print(f"Adding a potentiometer to {next.name}")
-            comp = Potentiometer()
-        elif component_type == "R": 
-            print(f"Adding a rotary encoder to handle {next.name}")
-            comp = RotaryEncoder()
-        else: return
-        # if isinstance(next, Variable):
-        #     lower, upper = next.get_bounds()
-        # else:
-        #     lower = next.lower_bound
-        #     upper = next.upper_bound
-        self.targets[next.name] = {
-            'component': comp,
-            'node': (component_type, node_id),
-            'value': 0,
-            # 'lower_bound': lower,
-            # 'upper_bound': upper,
-        }
-    
-    def get_value(self, target_name):
-        return self.targets[target_name]
-        
-    def update(self):
+        buffer = ''
         while True:
-            if self.targets is None: break 
-            new_data = self.serial_reader.update()
-            master_data = new_data.pop("master")
-            self.update_master(master_data)
-            for target in self.targets.values():
-                component_type, node_id = target['node']
-                value = new_data[component_type][node_id]
-                component = target["component"]
-                component.update(value)
-                # u = target["upper_bound"]
-                # l = target["lower_bound"]
-                # if component_type == "P":
-                #     value = np.interp(value, [0,1023], [l,u])
-                # else:
-                #     if value > u: value = u
-                #     if value < l: value = l
-                target["value"] = value
+            buffer += self._port.read(self._port.inWaiting()).decode("ascii")
+            if '\n' in buffer:
+                d, buffer = buffer.split('\n')[-2:]
+                try:
+                    dict_str, crc = d.rsplit('}', 1)
+                    dict_str = dict_str + '}'
+                    print(self.crc_check(dict_str, int(crc)))
+                    print(crc)
+                    print()
+                    data = ast.literal_eval(dict_str)
+                    if data is not None:
+                        self._data = data
+                except Exception as e:
+                    print("Couldn't parse data")
+                    print(f"got exception {e}")
 
-    
-    def update_master(self, data):
-        self.master.accept_button.update(data['Accept'])
-        self.master.decline_button.update(data['Decline'])
-        self.master.wheel.update(data['Rotary'])
-        # self.master['accept'] = data['Accept']
-        # self.master['decline'] = data['Decline']
-        # self.master['value'] = data['Rotary']
 
 
 if __name__ == "__main__":
-    # Objectives
-    def f1(xs):
-        xs = np.atleast_2d(xs)
-        return -xs[:, 0] - xs[:, 1] + 5
-
-    def f2(xs):
-        xs = np.atleast_2d(xs)
-        return (1 / 5) * (
-            np.square(xs[:, 0])
-            - 10 * xs[:, 0]
-            + np.square(xs[:, 1])
-            - 4 * xs[:, 1]
-            + 11
-        )
-
-    def f3(xs):
-        xs = np.atleast_2d(xs)
-        return (5 - xs[:, 0]) * (xs[:, 1] - 11)
-
-    obj1 = _ScalarObjective("obj1", f1)
-    obj2 = _ScalarObjective("obj2", f2)
-    obj3 = _ScalarObjective("obj3", f3)
-    objectives = [obj1, obj2, obj3]
-    objectives_n = len(objectives)
-
-    # variables
-    var_names = ["x1", "x2"]
-    variables_n = len(var_names)
-
-    initial_values = np.array([2, 3])
-    lower_bounds = [0, 0]
-    upper_bounds = [4, 6]
-    bounds = np.stack((lower_bounds, upper_bounds))
-    variables = variable_builder(var_names, initial_values, lower_bounds, upper_bounds)
-
-    # problem
-    problem = MOProblem(
-        objectives=objectives, variables=variables
-    )
-
-    m  = InterFace(problem)
-    while not m.ready:
-        pass
-    try:
-        while True:
-            print(m.master)
-            for target in m.targets.items():
-                print(target)
-            time.sleep(1) # Threading is bad :[
-            print()
-    except KeyboardInterrupt:
-        print("quitting...")
-    
-    quit()
+    s = SerialReader()
+    s.update()

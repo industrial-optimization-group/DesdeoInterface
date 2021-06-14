@@ -1,11 +1,14 @@
+#include <CRC8.h>
 #include <Potentiometer.h>
 #include <Button.h>
 #include <RotaryEncoder.h>
 #include <PJONSoftwareBitBang.h>
 #include <ArduinoJson.h>
 
+const uint8_t crcKey = 7;
+CRC8 crc = CRC8(crcKey);
 PJONSoftwareBitBang bus(0);
-StaticJsonDocument<512> doc; //512 is the RAM allocated to this document.
+StaticJsonDocument<256> doc; //512 is the RAM allocated to this document.
 JsonArray rotary = doc["master"].createNestedArray("Rotary");
 
 const int communicationPin = 12;
@@ -15,12 +18,12 @@ const int inputPin = 12;
 unsigned long startMillis;
 unsigned long currentMillis;
 
-// Make a own class for all component making and checking
+// Make a own class for component making and checking
 // Modulemaker or something
 
-// Have this serial sending as it's own class also
+// Have this serial sending as it's own class also?
 
-// 'Trick' the master to think the components connected to it are coming from a module
+// Master could have one internal component module
 Button buttons[2] = {Button(2,0), Button(3,1)};
 RotaryEncoder rotEncoder = RotaryEncoder(8,9,0);
 
@@ -45,16 +48,10 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
       slaveRotary[1] = payload[4];
     }
     else {return;}
-//    writeJsonToSerial();
+    writeJsonToSerial();
 //    uint8_t nodeComponentCount[1] = {getComponentCount(id)};
 //    bus.send_packet(id, nodeComponentCount, 1);
-    writeJsonToSerial();
 };
-
-void writeJsonToSerial(){
-   serializeJson(doc, Serial);
-   Serial.println();
-}
 
 uint8_t getComponentCount(int id) {
     uint8_t componentCount = 0;
@@ -66,10 +63,21 @@ uint8_t getComponentCount(int id) {
     return componentCount;
 }
 
+void writeJsonToSerial(){
+   String json;
+   serializeJson(doc, json);
+   int len = json.length() + 1;
+   uint8_t data[len];
+   json.getBytes(data, len);
+   uint8_t crc8 = crc.getCRC8(data, len - 1); // getBytes -> last is nul
+   Serial.print(json); // print data
+   Serial.println(crc8); // Add crc checksum 
+}
+
 void setup() {
   Serial.begin(9600);
   while (!Serial) {;}
-  bus.strategy.set_pins(12, 11);
+  bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
   startMillis = millis();
@@ -83,6 +91,8 @@ void loop() {
 
   doc["master"]["Accept"] = buttons[0].getValue();
   doc["master"]["Decline"] = buttons[1].getValue();
+  
   if (rotEncoder.hasChanged() || buttons[0].hasChanged() || buttons[1].hasChanged()) { writeJsonToSerial(); }
+
   bus.receive(1000);
 };
