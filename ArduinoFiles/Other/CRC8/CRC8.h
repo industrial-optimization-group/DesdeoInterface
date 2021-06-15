@@ -15,8 +15,8 @@ public:
 
 private:
     uint8_t _divisor;
-    uint8_t _lookupTable[256];
-    void createLookupTable();
+    //uint8_t _lookupTable[256];
+    //void createLookupTable();
 
 };
 

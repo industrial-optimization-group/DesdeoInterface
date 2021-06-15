@@ -10,7 +10,7 @@ const uint8_t crcKey = 7;
 CRC8 crc = CRC8(crcKey); // Crc4 vs paritycheck
 
 PJONSoftwareBitBang bus;
-StaticJsonDocument<256> doc; //512 is the RAM allocated to this document.
+StaticJsonDocument<512> doc; //512 is the RAM allocated to this document.
 JsonArray rotary = doc["master"].createNestedArray("Rotary");
 
 const int communicationPin = 12;
@@ -31,8 +31,8 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
     for (int i = 0; i < 6; ++i) {
       id += info.tx.mac[i];
     }
+    bus.reply("A", 1);
     String type;
-    //uint8_t id = (uint8_t)(payload[0]);
     type +=char(payload[0]);
     uint8_t componentId = (uint8_t)(payload[1]);
 
