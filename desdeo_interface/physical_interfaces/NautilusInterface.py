@@ -28,13 +28,12 @@ class NautilusInterface(Interface):
 
     def __init__(
         self,
-        master: Master,
         problem: MOProblem,
         button_pins: Union[np.array, List[int]] = [],
         potentiometer_pins: Union[np.array, List[int]] = [],
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
     ):
-        super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
+        super().__init__(problem, True)
     
     def get_iteration_count(self, index_start: int = 3) -> int:
         """
@@ -175,7 +174,7 @@ if __name__ == "__main__":
 
     # Interface
     master = Master()
-    interface = NautilusInterface(master,prob, potentiometer_pins= [0,1,2])
+    interface = NautilusInterface(prob)
 
     # start solving
     method = Nautilus(problem=prob, ideal=ideal, nadir=nadir)

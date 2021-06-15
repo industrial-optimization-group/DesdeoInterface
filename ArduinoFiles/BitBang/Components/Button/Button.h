@@ -1,10 +1,9 @@
 /*
-Button.h - A library for button component
+Button.h - A library for a button component
 */
 
 #ifndef Button_h
 #define Button_h
-
 
 #include "Component.h"
 #include "Arduino.h"
@@ -18,7 +17,6 @@ public:
 
 private:
     int _pin;
-
 };
 
 #endif

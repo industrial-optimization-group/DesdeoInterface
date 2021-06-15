@@ -1,5 +1,5 @@
 /*
-RotaryEncoder.h - Library for Rotary Encoders
+RotaryEncoder.h - Library for a rotary encoder
 */
 
 #ifndef RotaryEncoder_h

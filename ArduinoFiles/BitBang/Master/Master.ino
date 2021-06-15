@@ -2,21 +2,20 @@
 #include <Potentiometer.h>
 #include <Button.h>
 #include <RotaryEncoder.h>
+#define PJON_INCLUDE_MAC
 #include <PJONSoftwareBitBang.h>
 #include <ArduinoJson.h>
 
 const uint8_t crcKey = 7;
-CRC8 crc = CRC8(crcKey);
-PJONSoftwareBitBang bus(0);
+CRC8 crc = CRC8(crcKey); // Crc4 vs paritycheck
+
+PJONSoftwareBitBang bus;
 StaticJsonDocument<256> doc; //512 is the RAM allocated to this document.
 JsonArray rotary = doc["master"].createNestedArray("Rotary");
 
 const int communicationPin = 12;
 const int outputPin = 11;
 const int inputPin = 12;
-
-unsigned long startMillis;
-unsigned long currentMillis;
 
 // Make a own class for component making and checking
 // Modulemaker or something
@@ -27,35 +26,37 @@ unsigned long currentMillis;
 Button buttons[2] = {Button(2,0), Button(3,1)};
 RotaryEncoder rotEncoder = RotaryEncoder(8,9,0);
 
-void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info) {
+void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &info) {
+    String id;
+    for (int i = 0; i < 6; ++i) {
+      id += info.tx.mac[i];
+    }
     String type;
-    uint8_t id = (uint8_t)(payload[0]);
-    type +=char(payload[1]);
-    uint8_t componentId = (uint8_t)(payload[2]);
+    //uint8_t id = (uint8_t)(payload[0]);
+    type +=char(payload[0]);
+    uint8_t componentId = (uint8_t)(payload[1]);
 
     if (type == "B") {
-      uint16_t value = (uint16_t)(payload[3]);
-      doc[String(id)][type][String(componentId)] = value;
+      uint16_t value = (uint16_t)(payload[2]);
+      doc[id][type][String(componentId)] = value;
     }
     else if (type == "P") {
-      uint16_t value = ((uint16_t)(payload[3] << 8) | (uint16_t)(payload[4] & 0xFF));
-      doc[String(id)][type][String(componentId)] = value;
+      uint16_t value = ((uint16_t)(payload[2] << 8) | (uint16_t)(payload[3] & 0xFF));
+      doc[id][type][String(componentId)] = value;
     }
     else if (type == "R") {
-      JsonArray slaveRotary = doc[type][String(id)] ;
-      if (slaveRotary.isNull()) {slaveRotary = doc[String(id)][type].createNestedArray(String(componentId));}
-      slaveRotary[0] = payload[3];
-      slaveRotary[1] = payload[4];
+      JsonArray slaveRotary = doc[type][id] ;
+      if (slaveRotary.isNull()) {slaveRotary = doc[id][type].createNestedArray(String(componentId));}
+      slaveRotary[0] = payload[2];
+      slaveRotary[1] = payload[3];
     }
     else {return;}
     writeJsonToSerial();
-//    uint8_t nodeComponentCount[1] = {getComponentCount(id)};
-//    bus.send_packet(id, nodeComponentCount, 1);
 };
 
-uint8_t getComponentCount(int id) {
+uint8_t getComponentCount(String id) {
     uint8_t componentCount = 0;
-    JsonObject node = doc[String(id)].as<JsonObject>();
+    JsonObject node = doc[id].as<JsonObject>();
     for (JsonPair kv : node) {
       String compType = kv.key().c_str();
       componentCount += doc[String(id)][compType].size();
@@ -77,10 +78,10 @@ void writeJsonToSerial(){
 void setup() {
   Serial.begin(9600);
   while (!Serial) {;}
+  bus.set_id(0);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
-  startMillis = millis();
 };
 
 void loop() {

@@ -35,9 +35,7 @@ class RPMInterface(Interface):
         rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
     ):
         #super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
-        super().__init__(problem)
-        if len(problem.objectives) > len(self.value_handlers):
-            raise RPMException("Not enough variable handlers")
+        super().__init__(problem, True)
 
 
     def get_referencepoint(self) -> np.ndarray:

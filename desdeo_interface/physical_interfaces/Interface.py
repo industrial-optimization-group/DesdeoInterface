@@ -45,22 +45,21 @@ class Interface:
     def __init__(
         self,
         problem: MOProblem,
-        master: Master = None,
-        button_pins: Union[np.array, List[int]] = [],
-        potentiometer_pins: Union[np.array, List[int]] = [],
-        rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
+        handle_objectives: bool = True
     ):
         self.master = Master()
         self.serial_reader = SerialReader()
         self.problem = problem
         self.targets = {}
-        # Maybe instansiate corresponding component and handle value modification with the instance
-        self.construct(True)
-        self.update(True)
+
+        # Updates the 'raw' data which is read from the serial
+        self.raw_updater = threading.Thread(target=self.serial_reader.update, daemon=True)
+        self.raw_updater.start()
+        self.construct(handle_objectives)
+
+        # Updates each component
         self.updater = threading.Thread(target=self.update, daemon=True)
         self.updater.start()
-
-        self.problem = problem
 
         self.value_handlers = [
             target['component'] for target
@@ -68,8 +67,8 @@ class Interface:
             if target["node"][0] == "R"
             or target["node"][0] == "P"
         ]
+        print(self.value_handlers)
 
-        print (self.value_handlers)
  
         # Map the pins to actual components. Move to master?
         # self.buttons = list(map(lambda pin: Button(self.master.board, pin), button_pins))
@@ -234,35 +233,33 @@ class Interface:
     
     def construct(self, handle_objectives):
         print("Constructing the interface... This will take about 10 seconds")
-        now = time.time()
-        # Make sure each node has send data to master
-        data = None
-        while time.time() - now < 9:
-            new_data = self.serial_reader.update()
-            data = data if new_data is None else new_data
+        time.sleep(9) # Let the thread get values
+        raw_data = self.serial_reader.data()
+        print(f"found {len(raw_data.keys())} modules")
     
-        master_data = data.pop('master')
+        master_data = raw_data.pop('master')
         self.update_master(master_data)
+
         values_to_handle = self.problem.objectives if handle_objectives else self.problem.variables
 
-        p_count = sum([len(node['P']) for node in data.values() if 'P' in node])
-        r_count = sum([len(node['R']) for node in data.values() if 'R' in node])
+        p_count = sum([len(node['P']) for node in raw_data.values() if 'P' in node])
+        r_count = sum([len(node['R']) for node in raw_data.values() if 'R' in node])
 
         if len(values_to_handle) > p_count + r_count:
             raise Exception("Not enough handlers")
-        for node_id in data.keys():
-            for component_type in data[node_id].keys():
-                for component_id in data[node_id][component_type].keys():
-                    if len(values_to_handle) == 0: break
+
+        for node_id in raw_data.keys():
+            for component_type in raw_data[node_id].keys():
+                for component_id in raw_data[node_id][component_type].keys():
+                    if len(values_to_handle) == 0: break # All variables or objectives are assigned
                     self.assign_component(node_id, component_type, component_id, values_to_handle)
-        print("succefully constructed the interface")
-        self.ready = True
+        print("successfully constructed the interface")
     
     def assign_component(self, node_id, component_type, component_id, values_to_handle):
         if component_type == "B":
             print("Skipping button")
             return
-        next = values_to_handle.pop() # doesnt work with vector objectives
+        next = values_to_handle.pop() # What about vector objectives
         if component_type == "P":
             print(f"Adding a potentiometer to {next.name}")
             comp = Potentiometer()
@@ -288,51 +285,34 @@ class Interface:
         bound_min, bound_max = bounds
         return self.targets[target_name]['component'].get_value(bound_min, bound_max)
         
-    def update(self, once: bool = False):
+    def update(self):
         while True:
-            if self.targets is None: break 
-            new_data = None
-            while new_data is None:
-                new_data = self.serial_reader.update()
-            master_data = new_data.pop("master")
+            if self.targets is None: return 
+            raw_data = self.serial_reader.data()
+            if raw_data is None: return
+            master_data = raw_data.pop("master")
             self.update_master(master_data)
             for target in self.targets.values():
                 node_id = target['node']
                 component_type, component_id = target['component_info']
-                value = new_data[node_id][component_type][component_id]
+                value = raw_data[node_id][component_type][component_id]
                 component = target["component"]
                 if isinstance(value, int): value = [value]
                 component.update(value)
-                # u = target["upper_bound"]
-                # l = target["lower_bound"]
-                # if component_type == "P":
-                #     value = np.interp(value, [0,1023], [l,u])
-                # else:
-                #     if value > u: value = u
-                #     if value < l: value = l
                 target["value"] = value
-            if once: break
 
+    # MAYBE remove master
     def update_master(self, data):
         self.master.confirm_button.update([data['Accept']])
         self.master.decline_button.update([data['Decline']])
         self.master.wheel.update(data['Rotary'])
 
-
-
-    # MAYBE
-
-    # TODO
-    # Connect a component to the interface
-    def component_connect(self, component: Component):
-        return
-    
     # TODO 
     # Check if the interface has all required components
     def validate_interface(self):
         return
 
-# TODO mooooooore
+# TODO testing
 if __name__ == "__main__":
     pass
     # master = Master("COM3", 3,2,[8,9])

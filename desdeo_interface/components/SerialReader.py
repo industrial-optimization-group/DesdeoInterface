@@ -31,7 +31,6 @@ class SerialReader:
         data_arr = [ord(s) for s in data] + [crc]
         for d in data_arr:
             remainder = self.crc_lookup_table[d ^ remainder]
-        print(remainder)
         return remainder == 0
 
     def find(self, s):
@@ -59,22 +58,28 @@ class SerialReader:
     def update(self):
         buffer = ''
         while True:
-            buffer += self._port.read(self._port.inWaiting()).decode("ascii")
+            try:
+                buffer += self._port.read(self._port.inWaiting()).decode("ascii")
+            except UnicodeDecodeError:
+                print("Failed to decode a byte")
+                continue
             if '\n' in buffer:
                 d, buffer = buffer.split('\n')[-2:]
                 try:
                     dict_str, crc = d.rsplit('}', 1)
                     dict_str = dict_str + '}'
-                    print(self.crc_check(dict_str, int(crc)))
-                    print(crc)
-                    print()
+                    if not self.crc_check(dict_str, int(crc)):
+                        raise Exception("CRC8 checksum doesn't match")
                     data = ast.literal_eval(dict_str)
                     if data is not None:
-                        self._data = data
+                        self._data.update(data)
                 except Exception as e:
                     print("Couldn't parse data")
                     print(f"got exception {e}")
 
+    def data(self):
+        temp = self._data.copy()
+        return temp
 
 
 if __name__ == "__main__":
