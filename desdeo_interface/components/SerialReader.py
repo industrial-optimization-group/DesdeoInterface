@@ -73,6 +73,7 @@ class SerialReader:
                     data = ast.literal_eval(dict_str)
                     if data is not None:
                         self._data.update(data)
+                        print(self._data)
                 except Exception as e:
                     print("Couldn't parse data")
                     print(f"got exception {e}")
