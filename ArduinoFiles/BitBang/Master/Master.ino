@@ -6,22 +6,24 @@
 #include <PJONSoftwareBitBang.h>
 #include <ArduinoJson.h>
 
+bool interfaceReady = false;
+
 const uint8_t crcKey = 7;
 CRC8 crc = CRC8(crcKey); // Crc4 vs paritycheck
 
-union Value {
-  uint16_t value;
-  uint8_t values[2];
-};
+//union Value {
+//  uint16_t value;
+//  uint8_t values[2];
+//};
 
 struct Data {
-  Value value;
+  uint16_t value;
   uint8_t id;
   char type;
 };
 
 StaticJsonDocument<256> doc; //512 is the RAM allocated to this document.
-JsonArray rotary = doc["master"].createNestedArray("Rotary");
+//JsonArray rotary = doc["master"].createNestedArray("Rotary");
 
 PJONSoftwareBitBang bus;
 const int masterId = 254;
@@ -49,19 +51,20 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
 
     Data data;
     memcpy(&data, payload, sizeof(data));
-    
-    if (data.type == 'R') {
-      JsonArray values = doc[id][String(data.type)];
-      if (values.isNull()) 
-      {
-        values = doc[id][String(data.type)].createNestedArray(String(data.id));
-      }
-      values[0] = data.value.values[0];
-      values[1] = data.value.values[1];
-    }
-    else {
-      doc[id][String(data.type)][String(data.id)] = data.value.value;
-    }
+    doc[id][String(data.type)][String(data.id)] = data.value;
+//    if (data.type == 'R') {
+//      JsonArray values = doc[id][String(data.type)][String(data.id)];
+//      if (values.isNull()) 
+//      {
+//        Serial.println("Creating new array");
+//        values = doc[id][String(data.type)].createNestedArray(String(data.id));
+//      }
+//      values[0] = data.value.values[0];
+//      values[1] = data.value.values[1];
+//    }
+//    else {
+//      doc[id][String(data.type)][String(data.id)] = data.value.value;
+//    }
     writeJsonToSerial();
 //    if (type == "B") {
 //      uint16_t value = (uint16_t)(payload[2]);
@@ -104,25 +107,40 @@ void writeJsonToSerial(){
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial) {;}
   bus.set_id(masterId);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
-
-  bus.send_packet(PJON_BROADCAST,"S",1); // Broadcast 'S' indicating that the master is ready -> send over all the data
 };
 
 void loop() {
-  uint8_t values[2];
-  rotEncoder.getValues(values);
-  rotary[0] = values[0];
-  rotary[1] = values[1];
+  if (!interfaceReady) {
+    if (Serial.available() > 0) {
+      byte b = Serial.read();
+      if (char(b) == 'R') {
+        interfaceReady = true;
+        bus.send_packet(PJON_BROADCAST,"S",1);
+      }
+    }
+    return;
+  }
+//  uint8_t values[2];
+//  rotEncoder.getValues(values);
+//  rotary[0] = values[0];
+//  rotary[1] = values[1];
 
   doc["master"]["Accept"] = buttons[0].getValue();
   doc["master"]["Decline"] = buttons[1].getValue();
+  doc["master"]["Rotary"] = rotEncoder.getValue();
   
   if (rotEncoder.hasChanged() || buttons[0].hasChanged() || buttons[1].hasChanged()) { writeJsonToSerial(); }
 
   bus.receive(1000);
+  if (Serial.available() > 0) {
+      byte b = Serial.read();
+      if (char(b) == 'Q') {
+        interfaceReady = false; 
+        bus.send_packet(PJON_BROADCAST,"Q",1); // stop
+      }
+    }
 };

@@ -53,32 +53,22 @@ class Interface:
         self.targets = {}
 
         # Updates the 'raw' data which is read from the serial
-        self.raw_updater = threading.Thread(target=self.serial_reader.update, daemon=True)
-        self.raw_updater.start()
+        # self.raw_updater = threading.Thread(target=self.serial_reader.update, daemon=True)
+        # self.raw_updater.start()
         self.construct(handle_objectives)
 
         # Updates each component
         self.updater = threading.Thread(target=self.update, daemon=True)
         self.updater.start()
 
-        self.value_handlers = [
-            target['component'] for target
-            in list(self.targets.values()) 
-            if target["node"][0] == "R"
-            or target["node"][0] == "P"
-        ]
-        print(self.value_handlers)
+        # self.value_handlers = [
+        #     target['component'] for target
+        #     in list(self.targets.values()) 
+        #     if target["component_info"][0] == "R"
+        #     or target["component_info"][0] == "P"
+        # ]
 
- 
-        # Map the pins to actual components. Move to master?
-        # self.buttons = list(map(lambda pin: Button(self.master.board, pin), button_pins))
-        # potentiometers = list(map(lambda pin: Potentiometer(self.master.board, pin), potentiometer_pins))
-        # rotary_encoders = list(map(lambda pins: RotaryEncoder(self.master.board, pins), rotary_encoders_pins))
-
-        # self.value_handlers = potentiometers + rotary_encoders
-
-        # if (len(self.problem.variables) > len(self.value_handlers)): # ehh, i.e rmp doesn't need this check
-        #     raise InterfaceException("More variables than handlers")
+        # print(self.value_handlers)
     
     # If to_print doesn't fit on one line then its just gonna print to a lot of lines
     def print_over(self, to_print: str) -> None:
@@ -109,7 +99,7 @@ class Interface:
         if len(options) <= 0: 
             raise Exception("No options to choose from")
 
-        index_max = len(options) - 1
+        index_max = len(options)
         if (index_start < 0 or index_start > index_max):
             raise Exception("Starting index out of bounds")
 
@@ -117,7 +107,7 @@ class Interface:
 
         while not self.master.confirm_button.click():
             current = self.master.select(0, index_max)
-            self.print_over(f"Currently chosen {current}/{index_max}: {options[current]}")
+            self.print_over(f"Currently chosen {current}/{index_max - 1}: {options[current]}")
 
         print()
         return current, options[current]
@@ -216,9 +206,9 @@ class Interface:
             self.print_over(values)
         return values
 
-    def get_value_old(self, index: int, bounds: np.ndarray):
-        bound_min, bound_max = bounds
-        return self.value_handlers[index].get_value(bound_min, bound_max)
+    # def get_value_old(self, index: int, bounds: np.ndarray):
+    #     bound_min, bound_max = bounds
+    #     return self.value_handlers[index].get_value(bound_min, bound_max)
     
     def get_values(self, bounds: np.ndarray, int_values = False):
         while True:
@@ -226,16 +216,18 @@ class Interface:
             values = []
             for target in self.targets:
                 i = list(self.targets).index(target)
-                value = self.get_value(target, bounds[:,i])
+                value = self.get_value(target, bounds[:,i], int_values)
                 values.append(value)
             self.print_over(values)
         return values
     
     def construct(self, handle_objectives):
-        print("Constructing the interface... This will take about 10 seconds")
-        time.sleep(9) # Let the thread get values
+        print("Constructing the interface...")
+        time.sleep(3) # Let the thread get values
+        self.serial_reader.update()
         raw_data = self.serial_reader.data()
-        print(f"found {len(raw_data.keys())} modules")
+        print(f"found {len(raw_data.keys()) - 1} modules")
+        
     
         master_data = raw_data.pop('master')
         self.update_master(master_data)
@@ -244,6 +236,8 @@ class Interface:
 
         p_count = sum([len(node['P']) for node in raw_data.values() if 'P' in node])
         r_count = sum([len(node['R']) for node in raw_data.values() if 'R' in node])
+
+        print(f"found {p_count + r_count} components in total")
 
         if len(values_to_handle) > p_count + r_count:
             raise Exception("Not enough handlers")
@@ -281,12 +275,15 @@ class Interface:
             'upper_bound': upper,
         }
     
-    def get_value(self, target_name, bounds):
+    def get_value(self, target_name, bounds, int_values = False):
         bound_min, bound_max = bounds
-        return self.targets[target_name]['component'].get_value(bound_min, bound_max)
+        value = self.targets[target_name]['component'].get_value(bound_min, bound_max)
+        if int_values: value =  np.round(value)
+        return value
         
     def update(self):
         while True:
+            self.serial_reader.update()
             if self.targets is None: return 
             raw_data = self.serial_reader.data()
             if raw_data is None: return
@@ -297,14 +294,14 @@ class Interface:
                 component_type, component_id = target['component_info']
                 value = raw_data[node_id][component_type][component_id]
                 component = target["component"]
-                if isinstance(value, int): value = [value]
+                # if isinstance(value, int): value = [value]
                 component.update(value)
                 target["value"] = value
 
     # MAYBE remove master
     def update_master(self, data):
-        self.master.confirm_button.update([data['Accept']])
-        self.master.decline_button.update([data['Decline']])
+        self.master.confirm_button.update(data['Accept'])
+        self.master.decline_button.update(data['Decline'])
         self.master.wheel.update(data['Rotary'])
 
     # TODO 

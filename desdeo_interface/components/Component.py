@@ -13,7 +13,7 @@ class Component:
     """
 
     pins: List[Pin]
-    _pin_values: List[int]
+    _base_value: int
 
     #def __init__(self, board: Board, pins: List[int], is_digital: bool):
         # if is_digital:
@@ -25,7 +25,7 @@ class Component:
         #         raise Exception("Pin is invalid, should be in the range on 0-5")
         #     self.pins = list(map(lambda pin: board.get_pin(f'a:{pin}:i'), pins))
     def __init__(self) -> None:
-        self._pin_values = None
+        self._base_value = 0
         pass
     
     @staticmethod
@@ -47,15 +47,15 @@ class Component:
         return len(list(filter(is_in_range, pins))) == 0
     
     @property
-    def pin_values(self):
+    def base_value(self):
         """
         Read the values of the pins assigned to the component
         Returns:
             list[float]: value of each pin which is between 0.0 - 1.0 or -1.0 if pin is unavailable
         """
-        return self._pin_values
+        return self._base_value
         get_pin_value = lambda pin: pin.read() if pin.read() is not None else -1.0
         return list(map(get_pin_value, self.pins))
     
-    def update(self, pin_values: List[int]):
-        self._pin_values = pin_values
+    def update(self, value: int):
+        self._base_value = value

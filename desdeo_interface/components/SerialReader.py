@@ -1,3 +1,4 @@
+from os import startfile
 import serial
 from serial.serialutil import SerialException
 import serial.tools.list_ports
@@ -7,10 +8,12 @@ import numpy as np
 class SerialReader:
     def __init__(self, crc_key: np.uint8 = 7) -> None:
         self._data = {}
+        self._buffer = ''
         ports = self.find("Arduino Uno")
         if len(ports) == 0:
             raise Exception("Couldn't find a usable board")
-        self._port = self.get(ports)
+        self._port = self.open(ports)
+        self.start_communication()
         self.crc_lookup_table = self.create_lookup_table(crc_key)
     
     def create_lookup_table(self, key: np.uint8):
@@ -45,10 +48,11 @@ class SerialReader:
         print()
         return ss
 
-    def get(self, ports):
+    def open(self, ports):
         for port in ports:
             try:
                 uno = serial.Serial(port, 9600, timeout=.1)
+                if not uno.isOpen(): uno.open()
                 print(f"Port {port} is open")
                 return uno
             except SerialException:
@@ -56,27 +60,33 @@ class SerialReader:
         raise Exception("No available boards")
     
     def update(self):
-        buffer = ''
-        while True:
+        try:
+            self._buffer += self._port.read(self._port.inWaiting()).decode("ascii")
+        except UnicodeDecodeError:
+            print("Failed to decode a byte")
+            return
+        if '\n' in self._buffer:
+            d, self._buffer = self._buffer.split('\n')[-2:]
             try:
-                buffer += self._port.read(self._port.inWaiting()).decode("ascii")
-            except UnicodeDecodeError:
-                print("Failed to decode a byte")
-                continue
-            if '\n' in buffer:
-                d, buffer = buffer.split('\n')[-2:]
-                try:
-                    dict_str, crc = d.rsplit('}', 1)
-                    dict_str = dict_str + '}'
-                    if not self.crc_check(dict_str, int(crc)):
-                        raise Exception("CRC8 checksum doesn't match")
-                    data = ast.literal_eval(dict_str)
-                    if data is not None:
-                        self._data.update(data)
-                        print(self._data)
-                except Exception as e:
-                    print("Couldn't parse data")
-                    print(f"got exception {e}")
+                dict_str, crc = d.rsplit('}', 1)
+                dict_str = dict_str + '}'
+                if not self.crc_check(dict_str, int(crc)):
+                    raise Exception("CRC8 checksum doesn't match")
+                data = ast.literal_eval(dict_str)
+                if data is not None:
+                    self._data.update(data)
+            except Exception as e:
+                print("Couldn't parse data")
+                print(f"got exception {e}")
+    
+    def start_communication(self):
+        self._port.write('R'.encode("ascii"))
+        if self._port.read().decode('ascii') == '': self.start_communication()
+    
+    def end_communication(self):
+        self._port.write(b'Q')
+        self._port.close()
+        print("Port closed")
 
     def data(self):
         temp = self._data.copy()
@@ -85,4 +95,8 @@ class SerialReader:
 
 if __name__ == "__main__":
     s = SerialReader()
-    s.update()
+    try:
+        while True:
+            s.update()
+            print(s.data())
+    except KeyboardInterrupt: print('quittin')

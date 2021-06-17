@@ -28,16 +28,16 @@ class NimbusInterface(Interface):
 
     def __init__(
         self,
-        master: Master,
+        # master: Master,
         problem: MOProblem,
-        button_pins: Union[np.array, List[int]] = [],
-        potentiometer_pins: Union[np.array, List[int]] = [],
-        rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
+        # button_pins: Union[np.array, List[int]] = [],
+        # potentiometer_pins: Union[np.array, List[int]] = [],
+        # rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
     ):
-        super().__init__(master, problem, button_pins, potentiometer_pins, rotary_encoders_pins)
+        super().__init__(problem, True)
     
     def get_levels(self):
-        print("Set aspiration levels or upper bounds")
+        print("Set aspiration levels and/or upper bounds")
         return np.array(self.get_values(np.stack((self.problem.ideal, self.problem.nadir))))
     
     def get_classification(self) -> str:
@@ -148,24 +148,24 @@ if __name__ == "__main__":
     from desdeo_problem.Variable import variable_builder
     from desdeo_problem.Objective import _ScalarObjective
 
-    def plot(request_type: str):
-        plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
-        plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
-        plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
-        if request_type == "preferred":
-            for i, z in enumerate(preferred_request.content["objectives"]):
-                plt.scatter(z[0], z[1], label=f"solution {i}")
-        elif request_type == "save":
-            for i, z in enumerate(save_request.content["objectives"]):
-                plt.scatter(z[0], z[1], label=f"solution {i}")
-        else:
-            for i, z in enumerate(intermediate_request.content["objectives"]):
-                plt.scatter(z[0], z[1], label=f"solution {i}")
-        plt.xlabel("f1")
-        plt.ylabel("f2")
-        plt.title("Approximate Pareto front of the Kursawe function")
-        plt.legend()
-        plt.show()
+    # def plot(request_type: str):
+    #     plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
+    #     plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
+    #     plt.scatter(problem.nadir[0], problem.nadir[1], label="Nadir")
+    #     if request_type == "preferred":
+    #         for i, z in enumerate(preferred_request.content["objectives"]):
+    #             plt.scatter(z[0], z[1], label=f"solution {i}")
+    #     elif request_type == "save":
+    #         for i, z in enumerate(save_request.content["objectives"]):
+    #             plt.scatter(z[0], z[1], label=f"solution {i}")
+    #     else:
+    #         for i, z in enumerate(intermediate_request.content["objectives"]):
+    #             plt.scatter(z[0], z[1], label=f"solution {i}")
+    #     plt.xlabel("f1")
+    #     plt.ylabel("f2")
+    #     plt.title("Approximate Pareto front of the Kursawe function")
+    #     plt.legend()
+    #     plt.show()
     
     def f_1(xs: np.ndarray):
         xs = np.atleast_2d(xs)
@@ -176,6 +176,11 @@ if __name__ == "__main__":
         xs = np.atleast_2d(xs)
         return np.sum(np.abs(xs)**0.8 + 5*np.sin(xs**3), axis=1)
 
+    f1 = _ScalarObjective(name="f1", evaluator=f_1)
+    f2 = _ScalarObjective(name="f2", evaluator=f_2)
+
+    nadir=np.array([-14, 0.5])
+    ideal=np.array([-20, -12])
 
     varsl = variable_builder(
         ["x_1", "x_2", "x_3"],
@@ -183,21 +188,20 @@ if __name__ == "__main__":
         lower_bounds=[-5, -5, -5],
         upper_bounds=[5, 5, 5],
     )
-
-    f1 = _ScalarObjective(name="f1", evaluator=f_1)
-    f2 = _ScalarObjective(name="f2", evaluator=f_2)
-
-    nadir=np.array([-14, 0.5])
-    ideal=np.array([-20, -12])
+    from desdeo_tools.solver import ScalarMethod
+    from scipy.optimize import differential_evolution
+    scalar_method = ScalarMethod(
+        lambda x, _, **y: differential_evolution(x, **y), use_scipy=True, method_args={"polish": True, "disp": True}
+    )
 
     problem = MOProblem(variables=varsl, objectives=[f1, f2], ideal=ideal, nadir=nadir)
-    master = Master()
-    interface = NimbusInterface(master, problem, potentiometer_pins=[0,1,2,3,4,5])
+    interface = NimbusInterface(problem)
 
     
     from desdeo_mcdm.utilities.solvers import solve_pareto_front_representation
 
     p_front = solve_pareto_front_representation(problem, step=1.0)[1]
+    print(p_front)
 
     plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
     plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
@@ -210,9 +214,10 @@ if __name__ == "__main__":
 
     from desdeo_mcdm.interactive.NIMBUS import NIMBUS
 
-    method = NIMBUS(problem, "scipy_de")
+    method = NIMBUS(problem, scalar_method)
 
     classification_request, plot_request = method.start()
+
 
     print(classification_request.content["message"]) # Divide objective functions
     
@@ -225,6 +230,8 @@ if __name__ == "__main__":
         "number_of_solutions": solution_count,
         "levels": levels
     }
+
+    print(response)
     classification_request.response = response
 
     save_request, plot_request = method.iterate(classification_request)

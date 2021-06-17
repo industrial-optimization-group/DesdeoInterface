@@ -21,7 +21,7 @@ class Potentiometer(Component):
     def __init__(self, board: Board = None, pin: int = None):
         #super().__init__(board, [pin], False)
         super().__init__()
-        self.prev_value = 0 #self.pin_values[0]
+        self.prev_value = 0
 
     def get_value(self, min: float = 0, max: float = 1) -> float:
         """
@@ -36,13 +36,13 @@ class Potentiometer(Component):
         """
         if max - min <= 0: 
             raise Exception("Min value must be lower than max value!")
-        value_pin = self.pin_values[0] / 1023
-        value_pin = self.filter(value_pin)
-        self.prev_value = value_pin
-        current_value = (value_pin * (max - min)) + min
+        #value_pin = self._base_value / 1023
+        # value_pin = self.filter(value_pin)
+        #self.prev_value = value_pin
+        current_value = np.interp(self._base_value, (0, 1023), (min, max))
+        #current_value = (value_pin * (max - min)) + min
         return round(current_value, 3) # Temporary rounding so that printing looks somewhat decent
 
-    #TODO documentation
     def get_value_int(self, min: int = 0, max: int = 1) -> int: #inclusive
         return round(self.get_value(min, max))
 

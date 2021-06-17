@@ -98,9 +98,8 @@ class NautilusInterface(Interface):
         lower_bounds = np.array([1]*objective_count)
         upper_bounds = np.array([objective_count]*objective_count)
         bounds = np.stack((lower_bounds, upper_bounds)) 
-        return self.get_values(bounds) # TODO get integer values
+        return self.get_values(bounds, True)
     
-    # TODO sum of percentages = 100
     def get_preference_info_percentages(self):
         """
         Get percentages for objective preferences
@@ -113,7 +112,15 @@ class NautilusInterface(Interface):
         lower_bounds = np.array([0]*objective_count)
         upper_bounds = np.array([100]*objective_count)
         bounds = np.stack((lower_bounds, upper_bounds))
-        return self.get_values(bounds)
+        values = self.get_values(bounds)
+        values_sum = sum(values)
+        if values_sum > 100:
+            part = (values_sum - 100)/objective_count
+            values = [(value - part) for value in values]
+        elif values_sum < 100:
+            part = (100 - values_sum)/objective_count
+            values = [(value + part) for value in values]
+        return values
 
 
 #Testing

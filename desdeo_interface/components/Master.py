@@ -52,7 +52,7 @@ class Master:
             if self.decline_button.click(): return False
     
     def select(self, min, max):
-        return self.wheel.get_value(min, max, 1)
+        return self.wheel.get_value_discrete(min, max)
  
     @property
     def board(self):

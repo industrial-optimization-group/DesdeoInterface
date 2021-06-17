@@ -25,11 +25,25 @@ class RotaryEncoder(Component):
         #     raise Exception("Rotary encoder needs 2 digital pins")
         # super().__init__(board, pins, True)
         super().__init__()
-        self.state_prev = 0#self.pin_values[0] # Initial state
+        self.state_prev = 0 #self.pin_values[0] # Initial state
         self.current_value = 0
     
+    def get_value(self, min, max, step_size = 0.05):
+        actual_step_size = (max - min) / 65535
+        ratio = step_size / actual_step_size
+        scaled_value = (ratio * self._base_value) % 65535
+        value = np.interp(scaled_value, (0, 65535), (min, max))
+        return value
+    
+    def get_value_discrete(self, min, max): # [inclusive, exclusive]
+        value = self._base_value # between 0 and 2^16
+        r = max - min
+        if r < 0 or r > 65535: raise Exception("Range too large or max < min") # separate
+        return min + (value % r)
+        
+    
     # TODO Make it so that movements when not asked are not accounted for
-    def get_value(self, min: float = None, max: float = None, step: float = 0.01) -> float:
+    def get_value_old(self, min: float = None, max: float = None, step: float = 0.01) -> float:
         """
         Get the value from the rotary encoder
         Args:
