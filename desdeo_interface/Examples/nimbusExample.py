@@ -1,151 +1,17 @@
 import os, sys
-
-from matplotlib.pyplot import step
 p = os.path.abspath('.')
 sys.path.insert(1, p)
-
-from desdeo_interface.physical_interfaces.Interface import Interface
-from desdeo_interface.components.Button import Button
-from desdeo_interface.components.Potentiometer import Potentiometer
-from desdeo_interface.components.Master import Master
-from time import sleep
+from desdeo_interface.physical_interfaces.NimbusInterface import NimbusInterface
 import numpy as np
-from typing import Union, Optional, List, Tuple
+from desdeo_problem.Objective import _ScalarObjective
 from desdeo_problem.Problem import MOProblem
-
-class NimbusInterface(Interface):
-    """
-    A interface class for the Nimbus method
-    Args:
-        port (str): The serial port Arduino is connected
-        button_pins (Union[np.array, List[int]]): digital pins that are connected to buttons
-        potentiometer_pins (Union[np.array, List[int]]): analog pins that are connected to potentiometers
-        rotary_encoder_pins (Union[np.ndarray, List[List[int]]]): pairs of digital pins that are connected to rotary encoders
-        variable_bounds (Optional[np.ndarray]): Bounds for reference points, defaults to [0,1] for each variable
-    """
-
-    def __init__(
-        self,
-        # master: Master,
-        problem: MOProblem,
-        # button_pins: Union[np.array, List[int]] = [],
-        # potentiometer_pins: Union[np.array, List[int]] = [],
-        # rotary_encoders_pins: Union[np.ndarray, List[List[int]]] = [],
-    ):
-        super().__init__(problem, True)
-    
-    def get_levels(self):
-        print("Set aspiration levels and/or upper bounds")
-        return np.array(self.get_values(np.stack((self.problem.ideal, self.problem.nadir)), step_size = 0.05))
-    
-    def get_classification(self) -> str:
-        """
-        Choose a classification for an objective from ["<", "<=", "=", ">=", "0"]
-
-        Returns:
-            str: Chosen classification
-        """
-        classification_options = ["<", "<=", "=", ">=", "0"]
-        return self.choose_from(classification_options)[1]
-    
-    # Maybe this could be with value handlers aswell
-    def get_classifications(self) -> List[str]:
-        """
-        Choose a classification for each objective 
-
-        Returns:
-            List[str]: Chosen classifications
-        """
-        classifications = []
-        objective_count = self.problem.n_of_objectives
-        for obj_index in range(objective_count):
-            print(f"Pick a classification level for objective at index {obj_index}")
-            classification = self.get_classification()
-            classifications.append(classification)
-        print(f"Chosen classifications: {classifications}")
-        return classifications
-    
-    def specify_solution_count(self):
-        """
-        Specify the amount of solutions to be calculated in the next step
-
-        Returns:
-            int: The amount of solutions to be calculated
-        """
-        print("Select solution count")
-        return self.choose_value(1, 5)
-    
-    def pick_preferred_solution(self, solutions: np.ndarray):
-        """
-        Let the DM pick a preferred solution from a list of solutions
-
-        Returns:
-            Any: The preferred solution
-        """
-        return self.choose_from(solutions)[0]
-    
-    def should_continue(self):
-        """
-        Should the method be continued or stopped
-
-        Returns:
-            bool: Whether or not to continue
-        """
-        return self.confirmation("Continue?")
-
-    def try_another_classification(self):
-        """
-        Does the DM want to try another set of classifications
-
-        Returns:
-            bool: Whether or not to change classifications
-        """
-        return self.confirmation("Try another classification?")
-    
-    def show_different_alternatives(self):
-        """
-        Does the DM want to see different alternatives
-
-        Returns:
-            bool: Whether or not to see different alternatives
-        """
-        return self.confirmation("Show alternatives?")
-    
-    def save_solutions(self, solutions):
-        """
-        Let the DM pick solutions they want to be saved
-
-        Args:
-            solutions (np.ndarray): Array of selectable solutions
-
-        Returns:
-            List: A list of the solutions the DM wants to save
-        """
-        selected_solutions = self.choose_multiple(solutions, 0) # Get the solutions
-        selected_solutions = list(map(lambda s: s[0], selected_solutions)) # Only get the indices
-        return selected_solutions
-
-    def choose_two_solutions(self, solutions):
-        """
-        Let the DM choose two solutions for the intermediate solutions step
-
-        Args:
-            solutions (np.ndarray): Array of selectable solutions
-
-        Returns:
-            List: A list with the two chosen solutions
-        """
-        selected_solutions = self.choose_multiple(solutions,2,2)
-        selected_solutions = list(map(lambda s: s[0], selected_solutions))
-        return selected_solutions
-
-
+from desdeo_problem.Variable import variable_builder
+from desdeo_mcdm.interactive import NIMBUS
+import matplotlib.pyplot as plt
+from desdeo_problem.Problem import MOProblem
+from desdeo_problem.Variable import variable_builder
+from desdeo_problem.Objective import _ScalarObjective
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from desdeo_problem.Problem import MOProblem
-    from desdeo_problem.Variable import variable_builder
-    from desdeo_problem.Objective import _ScalarObjective
-
     def plot(request_type: str):
         plt.scatter(p_front[:, 0], p_front[:, 1], label="Pareto front")
         plt.scatter(problem.ideal[0], problem.ideal[1], label="Ideal")
@@ -164,7 +30,7 @@ if __name__ == "__main__":
         plt.title("Approximate Pareto front of the Kursawe function")
         plt.legend()
         plt.show()
-    
+
     def f_1(xs: np.ndarray):
         xs = np.atleast_2d(xs)
         xs_plusone = np.roll(xs, 1, axis=1)
@@ -215,8 +81,6 @@ if __name__ == "__main__":
     plt.title("Approximate Pareto front of the Kursawe function")
     plt.legend()
     plt.show()
-
-
 
     classification_request, plot_request = method.start()
     print(classification_request.content["objective_values"])

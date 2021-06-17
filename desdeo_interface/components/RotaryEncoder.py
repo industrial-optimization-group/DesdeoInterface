@@ -28,11 +28,13 @@ class RotaryEncoder(Component):
         self.state_prev = 0 #self.pin_values[0] # Initial state
         self.current_value = 0
     
-    def get_value(self, min, max, step_size = 0.05):
+    def get_value(self, min, max, step_size = 0.05, integer_values = False):
+        if integer_values: step_size = 1
         actual_step_size = (max - min) / 65535
         ratio = step_size / actual_step_size
         scaled_value = (ratio * self._base_value) % 65535
-        value = np.interp(scaled_value, (0, 65535), (min, max))
+        value = (np.interp(scaled_value, (0, 65535), (min, max)))
+        if integer_values: value = int(np.round(value))
         return value
     
     def get_value_discrete(self, min, max): # [inclusive, exclusive]

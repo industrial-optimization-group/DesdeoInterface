@@ -23,7 +23,7 @@ class Potentiometer(Component):
         super().__init__()
         self.prev_value = 0
 
-    def get_value(self, min: float = 0, max: float = 1) -> float:
+    def get_value(self, min: float = 0, max: float = 1, _step_size = None, int_values = False) -> float:
         """
         Reads the value of the analog pin the potentiometer is connected and scales it
         Args:
@@ -40,6 +40,7 @@ class Potentiometer(Component):
         # value_pin = self.filter(value_pin)
         #self.prev_value = value_pin
         current_value = np.interp(self._base_value, (0, 1023), (min, max))
+        if int_values: int(np.round(current_value))
         #current_value = (value_pin * (max - min)) + min
         return round(current_value, 3) # Temporary rounding so that printing looks somewhat decent
 

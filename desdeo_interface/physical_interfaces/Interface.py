@@ -51,15 +51,15 @@ class Interface:
         self.serial_reader = SerialReader()
         self.problem = problem
         self.targets = {}
-
         # Updates the 'raw' data which is read from the serial
         # self.raw_updater = threading.Thread(target=self.serial_reader.update, daemon=True)
         # self.raw_updater.start()
         self.construct(handle_objectives)
 
-        # Updates each component
+        # # Updates each component
         self.updater = threading.Thread(target=self.update, daemon=True)
         self.updater.start()
+
 
         # self.value_handlers = [
         #     target['component'] for target
@@ -143,7 +143,7 @@ class Interface:
         return selected_options
         
     
-    def choose_value(self, index_min: float = 0, index_max: float = 100, index_start: float = None, step: float = 1) -> float:
+    def choose_value(self, index_min: float = 0, index_max: float = 100, step: float = 1) -> float:
         """
         Let the dm choose an number from a given range 
         Args:
@@ -159,23 +159,12 @@ class Interface:
         if (index_min >= index_max):
             raise Exception("index_min is not lower than index_max")
         
-        if (index_start is None):
-            index_start = index_min
-
-        if (index_start < index_min or index_start > index_max):
-            raise Exception("Starting index out of bounds")
-        
         if (step <= 0):
             raise Exception("Step size must a positive number greater than zero")
 
         if ((index_max - index_min) % step != 0):
             raise Exception("Step size is invalid, won't reach min or max values")
         
-        if ((index_max - index_start) % step != 0):
-            raise Exception("Won't reach min or max values with selected starting value and step size")
-
-        self.master.wheel.current_value = index_start
-
         while not self.master.confirm_button.click():
             current = self.master.select(index_min, index_max)
             self.print_over(f"Currently chosen {current}")
@@ -210,13 +199,15 @@ class Interface:
     #     bound_min, bound_max = bounds
     #     return self.value_handlers[index].get_value(bound_min, bound_max)
     
-    def get_values(self, bounds: np.ndarray, int_values = False):
+    def get_values(self, bounds: np.ndarray, step_size = 0.05, int_values = False):
         while True:
-            if self.master.confirm_button.click(): break
+            if self.master.confirm_button.click(): 
+                print("OK!")
+                break
             values = []
             for target in self.targets:
                 i = list(self.targets).index(target)
-                value = self.get_value(target, bounds[:,i], int_values)
+                value = self.get_value(target, bounds[:,i], step_size, int_values)
                 values.append(value)
             self.print_over(values)
         return values
@@ -232,7 +223,7 @@ class Interface:
         master_data = raw_data.pop('master')
         self.update_master(master_data)
 
-        values_to_handle = self.problem.objectives if handle_objectives else self.problem.variables
+        values_to_handle = self.problem.objectives.copy() if handle_objectives else self.problem.variables.copy()
 
         p_count = sum([len(node['P']) for node in raw_data.values() if 'P' in node])
         r_count = sum([len(node['R']) for node in raw_data.values() if 'R' in node])
@@ -275,10 +266,9 @@ class Interface:
             'upper_bound': upper,
         }
     
-    def get_value(self, target_name, bounds, int_values = False):
+    def get_value(self, target_name, bounds, step_size = 1, int_values = False):
         bound_min, bound_max = bounds
-        value = self.targets[target_name]['component'].get_value(bound_min, bound_max)
-        if int_values: value =  np.round(value)
+        value = self.targets[target_name]['component'].get_value(bound_min, bound_max, step_size, int_values)
         return value
         
     def update(self):

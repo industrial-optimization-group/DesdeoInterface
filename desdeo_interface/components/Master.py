@@ -1,4 +1,5 @@
 import os, sys
+from desdeo_mcdm import interactive
 p = os.path.abspath('.')
 sys.path.insert(1, p)
 
@@ -52,7 +53,7 @@ class Master:
             if self.decline_button.click(): return False
     
     def select(self, min, max):
-        return self.wheel.get_value_discrete(min, max)
+        return self.wheel.get_value(min, max, integer_values=True)
  
     @property
     def board(self):

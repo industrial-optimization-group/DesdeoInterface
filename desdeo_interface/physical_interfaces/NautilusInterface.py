@@ -35,7 +35,7 @@ class NautilusInterface(Interface):
     ):
         super().__init__(problem, True)
     
-    def get_iteration_count(self, index_start: int = 3) -> int:
+    def get_iteration_count(self) -> int:
         """
         Choose the iteration count for nautilusnavigator
 
@@ -46,7 +46,7 @@ class NautilusInterface(Interface):
             int: Desired iteration count
         """
         print("\nSet a new iteration count")
-        return int(self.choose_value(index_min = 1, index_start = index_start))
+        return int(self.choose_value(index_min = 1))
     
     def step_back(self) -> bool:
         """
@@ -98,7 +98,7 @@ class NautilusInterface(Interface):
         lower_bounds = np.array([1]*objective_count)
         upper_bounds = np.array([objective_count]*objective_count)
         bounds = np.stack((lower_bounds, upper_bounds)) 
-        return self.get_values(bounds, True)
+        return self.get_values(bounds, 1, True)
     
     def get_preference_info_percentages(self):
         """
@@ -112,14 +112,17 @@ class NautilusInterface(Interface):
         lower_bounds = np.array([0]*objective_count)
         upper_bounds = np.array([100]*objective_count)
         bounds = np.stack((lower_bounds, upper_bounds))
-        values = self.get_values(bounds)
+        values = self.get_values(bounds, 1, True)
         values_sum = sum(values)
         if values_sum > 100:
-            part = (values_sum - 100)/objective_count
+            part = int(np.floor((values_sum - 100)/objective_count))
             values = [(value - part) for value in values]
         elif values_sum < 100:
-            part = (100 - values_sum)/objective_count
+            part = int(np.ceil((100 - values_sum)/objective_count))
             values = [(value + part) for value in values]
+        overflow = sum(values) - 100
+        for i in range(overflow):
+            values[i] = values[i] - 1
         return values
 
 
