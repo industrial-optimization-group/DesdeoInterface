@@ -1,8 +1,9 @@
+#include <ConfiguationFinder.h>
 #include <Component.h>
 #include <Potentiometer.h>
 #include <RotaryEncoder.h>
 #include <Button.h>
-#define PJON_INCLUDE_MAC
+//#define PJON_INCLUDE_MAC
 #include <PJONSoftwareBitBang.h>
 
 
@@ -26,56 +27,35 @@ Button buttons[buttonCount];
 //Component components[compCount];
 
 // Communication
-uint8_t mac[6] = {1,2,1,2,1,2}; // temporary mac
-PJONSoftwareBitBang bus(mac);
-const int outputPin = 12;
-const int inputPin = 11;
-const int communicationPin = 12;
-const int master = 254;
+uint8_t id = PJON_NOT_ASSIGNED; // Temporary
+//uint8_t mac[6] = {1,2,1,2,1,2}; // temporary mac
+PJONSoftwareBitBang bus(id);
+const uint8_t outputPin = 12;
+const uint8_t inputPin = 11;
+const uint8_t communicationPin = 12;
+const uint8_t master = 254;
 bool interfaceReady = false;
 
-
+ConfigurationFinder cf = ConfigurationFinder(4,5,6,7); // UP, RIGHT, DOWN, LEFT
+bool waitingForLight = false;
+bool latestReceiver = false;
 //// These could be a own thing somewhere
 //union Value {
 //  uint16_t value;
 //  uint8_t values[2];
 //};
 
+struct Counts {
+  uint8_t rots;
+  uint8_t pots;
+  uint8_t buttons;
+};
+
 struct Data {
   uint16_t value;
   uint8_t id;
   char type;
 };
-
-
-// Send potentiometer data to master
-//void sendPotData(int potIndex, uint16_t value)
-//{
-//  Potentiometer pot = pots[potIndex];
-//  char type = pot.getType();
-//  uint8_t potId = pot.getId();
-//  uint8_t content[4] = {type, potId, (uint8_t)(value >> 8), (uint8_t)(value & 0xFF)};
-//  bool success = sendToMaster(content, 4);
-//  pots[potIndex] = pot;
-//}
-//
-//void sendRotData(int rotIndex, uint8_t values[2])
-//{
-//  RotaryEncoder rot = rots[rotIndex];
-//  uint8_t content[4] = {rot.getType(), rot.getId(), values[0], values[1]};
-//  sendToMaster(content, 4);
-//  rots[rotIndex] = rot;
-//}
-//
-//void sendButtonData(int bIndex, uint8_t value)
-//{
-//  Button button = buttons[bIndex];
-//  char type = button.getType();
-//  uint8_t bId = button.getId();
-//  uint8_t content[3] = {type, bId, value};
-//  sendToMaster(content, 3);
-//  buttons[bIndex] = button;
-//}
 
 bool sendData(Data data, bool forceSend = false) {
   uint16_t packet = forceSend ? bus.send_packet_blocking(master, &data, sizeof(data)) : bus.send_packet(master, &data, sizeof(data));
@@ -108,11 +88,6 @@ void checkRots(bool forceSend = false)
   for (int i = 0; i < rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
-//    uint8_t values[2];
-//    rot.getValues(values);
-//    Value value;
-//    value.values[0] = values[0];
-//    value.values[1] = values[1];
     uint16_t value = rot.getValue();
     rots[i] = rot;
     if (rot.hasChanged() || forceSend)
@@ -164,9 +139,30 @@ void checkButtons(bool forceSend = false)
 //  }
 //}
 
+
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
-  if (char(payload[0]) == 'S')
+  if (char(payload[0]) == 'L'){ // initial LAYOUT
+     Serial.println("Received L\nSetting pins to input");
+     cf.setPinsInput();
+     waitingForLight = true;
+  }
+  else if (char(payload[0]) == 'I') { // ID
+    if (latestReceiver && id == PJON_NOT_ASSIGNED) {
+      id = payload[1];
+      Serial.println(id);
+      bus.set_id(id);
+      waitingForLight = false;
+      latestReceiver = false;
+    }
+  }
+  else if (char(payload[0]) == 'N') { // New instructions
+    // Should check if this node is already gone through all directions, loop situations
+    Serial.println("New instructions");
+    uint8_t dir = payload[1];
+    cf.setPinHigh(dir);
+  }
+  else if (char(payload[0]) == 'S') // SEND
   {
     delay(random(2000));
     interfaceReady = true;
@@ -174,8 +170,11 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
     checkRots(true);
     checkButtons(true);
   }
-  else if (char(payload[0]) == 'Q') {
+  else if (char(payload[0]) == 'Q') { // QUIT
     interfaceReady = false;
+  }
+  else {
+    Serial.println(payload[0]);
   }
 }
 
@@ -187,9 +186,10 @@ void randomizeMac(uint8_t mac[]) {
 
 void setup()
 {
+  Serial.begin(9600);
   randomSeed(analogRead(0));
-  randomizeMac(mac);
-  bus.set_mac(mac);
+//  randomizeMac(mac);
+//  bus.set_mac(mac);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
@@ -218,7 +218,15 @@ void setup()
 
 void loop()
 {
-  bus.receive(1000); // It is not guaranteed that slaves will receive the 'Q' command from the master
+  bus.receive(1500); // It is not guaranteed that slaves will receive the 'Q' command from the master
+  if (waitingForLight) {
+    if (cf.isAnyPinHigh()) {
+      Serial.println("A pin is high");
+      latestReceiver = true;
+      bus.send_packet_blocking(master, "O", 1);
+      bus.receive(2500);
+    }
+  }
   if (!interfaceReady) { // If not ready just wait until it is
     return;
   }

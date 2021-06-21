@@ -1,3 +1,4 @@
+#include <ConfiguationFinder.h>
 #include <CRC8.h>
 #include <Potentiometer.h>
 #include <Button.h>
@@ -7,14 +8,13 @@
 #include <ArduinoJson.h>
 
 bool interfaceReady = false;
+uint8_t nextId = 1;
+uint8_t stack[32][2]; // Use this array like a stack, maybe implement a stack at some point
+int8_t stackTop = 0; // master at bottom
+int positions[32];
 
 const uint8_t crcKey = 7;
 CRC8 crc = CRC8(crcKey); // Crc4 vs paritycheck
-
-//union Value {
-//  uint16_t value;
-//  uint8_t values[2];
-//};
 
 struct Data {
   uint16_t value;
@@ -22,8 +22,9 @@ struct Data {
   char type;
 };
 
-StaticJsonDocument<256> doc; //512 is the RAM allocated to this document.
-//JsonArray rotary = doc["master"].createNestedArray("Rotary");
+ConfigurationFinder cf = ConfigurationFinder(4,5,6,7); // UP, RIGHT, DOWN, LEFT
+
+StaticJsonDocument<256> doc; //256 is the RAM allocated to this document.
 
 PJONSoftwareBitBang bus;
 const int masterId = 254;
@@ -41,47 +42,21 @@ Button buttons[2] = {Button(2,0), Button(3,1)};
 RotaryEncoder rotEncoder = RotaryEncoder(8,9,0);
 
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &info) {
-    String id;
-    for (int i = 0; i < 6; ++i) {
-      id += info.tx.mac[i];
-    }
-//    String type;
-//    type +=char(payload[0]);
-//    uint8_t componentId = (uint8_t)(payload[1]);
 
-    Data data;
-    memcpy(&data, payload, sizeof(data));
-    doc[id][String(data.type)][String(data.id)] = data.value;
-//    if (data.type == 'R') {
-//      JsonArray values = doc[id][String(data.type)][String(data.id)];
-//      if (values.isNull()) 
-//      {
-//        Serial.println("Creating new array");
-//        values = doc[id][String(data.type)].createNestedArray(String(data.id));
-//      }
-//      values[0] = data.value.values[0];
-//      values[1] = data.value.values[1];
-//    }
-//    else {
-//      doc[id][String(data.type)][String(data.id)] = data.value.value;
-//    }
-    writeJsonToSerial();
-//    if (type == "B") {
-//      uint16_t value = (uint16_t)(payload[2]);
-//      doc[id][type][String(componentId)] = value;
-//    }
-//    else if (type == "P") {
-//      uint16_t value = ((uint16_t)(payload[2] << 8) | (uint16_t)(payload[3] & 0xFF));
-//      doc[id][type][String(componentId)] = value;
-//    }
-//    else if (type == "R") {
-//      JsonArray slaveRotary = doc[type][id] ;
-//      if (slaveRotary.isNull()) {slaveRotary = doc[id][type].createNestedArray(String(componentId));}
-//      slaveRotary[0] = payload[2];
-//      slaveRotary[1] = payload[3];
-//    }
-//    else {return;}
-//    writeJsonToSerial();
+    if (char(payload[0]) == 'O') {
+       Serial.println("Received from slave"); 
+       return;
+    }
+    else {
+      String id;
+      for (int i = 0; i < 6; ++i) {
+        id += info.tx.mac[i];
+      }
+      Data data;
+      memcpy(&data, payload, sizeof(data));
+      doc[id][String(data.type)][String(data.id)] = data.value;
+      writeJsonToSerial();
+    }
 };
 
 uint8_t getComponentCount(String id) {
@@ -105,8 +80,98 @@ void writeJsonToSerial(){
    Serial.println(crc8); // Add crc checksum 
 }
 
+void configuration() {
+    uint8_t dir = stack[stackTop][1];
+    if (dir == 4) {
+      if (stackTop == 0) { // Master checked all its directions
+        Serial.println("Configuration done");
+        for (int i = 0; i < 32; ++i) {
+          if ( i == 0 || positions[i] > 0) {
+            Serial.print("Node with id: ");
+            Serial.print(i);
+            Serial.print(" is in position: ");
+            String pos = getPosition(positions[i]);
+            for (int i = pos.length()-2; i >= 0; i--){
+              if (pos[i] == '0') Serial.print("UP ");
+              else if (pos[i] == '1') Serial.print("RIGHT ");
+              else if (pos[i] == '2') Serial.print("DOWN ");
+              else Serial.print("LEFT ");
+            }
+            Serial.println();
+          }
+        }
+      } else { // Slave has checked all its directions
+        stackTop--;
+ 
+      }
+      return;
+    }
+    
+    if (stackTop == 0){ // master at top
+      Serial.print("Master light up ");
+      Serial.println(dir);
+      cf.setPinHigh(dir);
+    }
+    else { //  slave from stack
+         Serial.print(stack[stackTop][0]);
+         Serial.println(" Slave light up");
+         uint8_t content[2] = {'N', dir};
+         bus.send_packet_blocking(stack[stackTop][0], content, 2); // send instruction to slave
+    }
+
+    
+    uint16_t response = bus.receive(500000); // 0.5 seconds
+    if (response == PJON_ACK) { // Someone received the data
+      Serial.println("new slave");
+      positions[nextId] = givePosition();
+      uint8_t content[2] = {'I', nextId};
+      stack[++stackTop][0] = nextId++;
+      stack[stackTop][1] = 0;
+      bus.send_packet_blocking(PJON_BROADCAST, content, 2);
+      configuration();
+    }
+     stack[stackTop][1] = dir + 1;
+     configuration();
+}
+
+
+// Directions are 4 base so convert the 4 base direction to decimal
+// Assuming that up is reserver for usb, so 0 1 cant happen -> 0 0 1 cant happen -> no overlaps
+// Example: right, up, left -> 1 0 3 -> 19
+// If is not -> default right movement 
+// (right), up, left, right -> 1 0 3 1
+int givePosition() {
+  int pos = power(4, (stackTop + 1));
+  for (int i = 0; i <= stackTop; i++) {
+    pos += stack[i][1] * power(4, (stackTop - i));
+  }
+  return pos;
+}
+
+int power(int base, int exponent) {
+  int p = 1;
+  for(int i = 0; i < exponent; ++i) {
+    p *= base;
+  }
+  return p;
+}
+
+String getPosition(int pos) {
+   String directions = "";
+   int left = pos / 4;
+   uint8_t remainder = pos % 4;
+   directions += remainder;
+   while (left > 0) {
+    remainder = left % 4;
+    directions += remainder;
+    left = left / 4;
+   }
+   return directions;
+}
+
 void setup() {
   Serial.begin(9600);
+  cf.setPinsInput();
   bus.set_id(masterId);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
@@ -118,8 +183,11 @@ void loop() {
     if (Serial.available() > 0) {
       byte b = Serial.read();
       if (char(b) == 'R') {
-        interfaceReady = true;
-        bus.send_packet(PJON_BROADCAST,"S",1);
+        bus.send_packet_blocking(PJON_BROADCAST,"L",1);
+        Serial.println("Sent L broadcast");
+        configuration();
+        //interfaceReady = true;
+        //bus.send_packet(PJON_BROADCAST,"S",1);
       }
     }
     return;
