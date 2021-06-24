@@ -3,21 +3,17 @@
 #include <Potentiometer.h>
 #include <RotaryEncoder.h>
 #include <Button.h>
-//#define PJON_INCLUDE_MAC
 #include <PJONSoftwareBitBang.h>
 
 
 // Adjust these values depending on the node
-//uint8_t id = 255; // Make sure each node has a different id
-
-const uint8_t potCount = 2; // How many potentiometers are connected to the node
-const uint8_t rotCount = 1; // Rotary encoders
+const uint8_t potCount = 1; // How many potentiometers are connected to the node
+const uint8_t rotCount = 0; // Rotary encoders
 const uint8_t buttonCount = 0; // Buttons
 
-const uint8_t potPins[potCount] = {A5, A6}; // The pins the potentiometers are connected
-const uint8_t rotPins[rotCount][2] = {{3,4}}; // {{8,9}}; // Rotary encoders
+const uint8_t potPins[potCount] = {A5}; // The pins the potentiometers are connected
+const uint8_t rotPins[rotCount][2] = {}; // {{8,9}}; // Rotary encoders
 const uint8_t bPins[buttonCount] = {}; // Buttons
-
 // Adjust Until here
 
 Potentiometer pots[potCount];
@@ -28,36 +24,29 @@ Button buttons[buttonCount];
 
 // Communication
 uint8_t id = PJON_NOT_ASSIGNED; // Temporary
-//uint8_t mac[6] = {1,2,1,2,1,2}; // temporary mac
 PJONSoftwareBitBang bus(id);
 const uint8_t outputPin = 12;
 const uint8_t inputPin = 11;
-const uint8_t communicationPin = 12;
 const uint8_t master = 254;
 bool interfaceReady = false;
 
+// For alive messages
+unsigned long lastAliveSent;
+int aliveSendInterval = 1000; //milliseconds + random(1000)
+  
 ConfigurationFinder cf = ConfigurationFinder(4,5,6,7); // UP, RIGHT, DOWN, LEFT
 bool waitingForLight = false;
 bool latestReceiver = false;
-//// These could be a own thing somewhere
-//union Value {
-//  uint16_t value;
-//  uint8_t values[2];
-//};
-
-struct Counts {
-  uint8_t rots;
-  uint8_t pots;
-  uint8_t buttons;
-};
 
 struct Data {
+  uint8_t nodeId;
   uint16_t value;
   uint8_t id;
   char type;
 };
 
 bool sendData(Data data, bool forceSend = false) {
+  data.nodeId = id;
   uint16_t packet = forceSend ? bus.send_packet_blocking(master, &data, sizeof(data)) : bus.send_packet(master, &data, sizeof(data));
   return (packet != PJON_ACK);
 }
@@ -68,8 +57,6 @@ void checkPots(bool forceSend = false)
   for (int i = 0; i < potCount; i++)
   {
     Potentiometer pot = pots[i];
-//    Value value;
-//    value.value = pot.getValue();
     uint16_t value = pot.getValue();
     pots[i] = pot;
     if (pot.hasChanged() || forceSend)
@@ -143,53 +130,39 @@ void checkButtons(bool forceSend = false)
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
   if (char(payload[0]) == 'L'){ // initial LAYOUT
-     Serial.println("Received L\nSetting pins to input");
+//     Serial.println("Received L\nSetting pins to input");
      cf.setPinsInput();
      waitingForLight = true;
   }
   else if (char(payload[0]) == 'I') { // ID
     if (latestReceiver && id == PJON_NOT_ASSIGNED) {
       id = payload[1];
-      Serial.println(id);
       bus.set_id(id);
       waitingForLight = false;
       latestReceiver = false;
     }
   }
   else if (char(payload[0]) == 'N') { // New instructions
-    // Should check if this node is already gone through all directions, loop situations
-    Serial.println("New instructions");
     uint8_t dir = payload[1];
     cf.setPinHigh(dir);
   }
-  else if (char(payload[0]) == 'S') // SEND
+  else if (char(payload[0]) == 'S') // SEND data, interface is ready and configured
   {
-    delay(random(2000));
+    lastAliveSent = millis();
     interfaceReady = true;
-    checkPots(true);
-    checkRots(true);
-    checkButtons(true);
   }
   else if (char(payload[0]) == 'Q') { // QUIT
     interfaceReady = false;
   }
   else {
-    Serial.println(payload[0]);
-  }
-}
-
-void randomizeMac(uint8_t mac[]) {
-  for (int i = 0; i < 6; ++i) {
-    mac[i] = random(256);
+    return;
   }
 }
 
 void setup()
 {
-  Serial.begin(9600);
-  randomSeed(analogRead(0));
-//  randomizeMac(mac);
-//  bus.set_mac(mac);
+  randomSeed(analogRead(A0));
+  aliveSendInterval += random(1000);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
@@ -216,23 +189,37 @@ void setup()
   }
 }
 
+void sendAliveMsg() {
+  uint8_t content[2] = {'A', id}; 
+  bus.send_packet_blocking(master, content, 2);
+}
+
+void sendComponentInfo() {
+  uint8_t content[4] = {'C', potCount, rotCount, buttonCount}; 
+  bus.send_packet(master, content, 4);
+}
+
 void loop()
 {
   bus.receive(1500); // It is not guaranteed that slaves will receive the 'Q' command from the master
   if (waitingForLight) {
     if (cf.isAnyPinHigh()) {
-      Serial.println("A pin is high");
       latestReceiver = true;
-      bus.send_packet_blocking(master, "O", 1);
+      sendComponentInfo();
       bus.receive(2500);
     }
   }
-  if (!interfaceReady) { // If not ready just wait until it is
+  if (!interfaceReady) { // Wait until interface is ready
     return;
   }
 
-  checkPots();
-  checkRots();
+  if (millis() - lastAliveSent > aliveSendInterval) {
+    lastAliveSent = millis();
+    sendAliveMsg();
+  }
+
+  checkPots(); //ADC
+  checkRots(); //Interupts
   checkButtons();
 //    checkComponents();
 };

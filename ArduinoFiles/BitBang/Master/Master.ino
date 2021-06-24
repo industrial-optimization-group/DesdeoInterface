@@ -7,68 +7,81 @@
 #include <PJONSoftwareBitBang.h>
 #include <ArduinoJson.h>
 
-bool interfaceReady = false;
-uint8_t nextId = 1;
-uint8_t stack[32][2]; // Use this array like a stack, maybe implement a stack at some point
-int8_t stackTop = 0; // master at bottom
-int positions[32];
-
-const uint8_t crcKey = 7;
-CRC8 crc = CRC8(crcKey); // Crc4 vs paritycheck
+// thoughs about using dictionary from arduino library 
 
 struct Data {
+  uint8_t nodeId;
   uint16_t value;
   uint8_t id;
   char type;
 };
 
+typedef struct {
+  uint8_t buttons;
+  uint8_t rotaries;
+  uint8_t potentiometers;
+  int location;
+  unsigned long lastAlive;
+} node;
+
+const uint8_t maxNodes = 8;
+
+// Configuration
+bool interfaceReady = false;
+uint8_t nextId = 1; // upto 253, Do not start from 0 as that is for broadcasting
+uint8_t stack[maxNodes][2]; // Use this array like a stack. Adjust stack size if a node might be more than 32 nodes away from master
+int8_t stackTop = 0; // master at bottom
+//int positions[64]; // Index equals to the node id, except master is at 0, this could be modified so we save one int of space
+node nodes[maxNodes]; // position, lastAlive, potCount, bCount, Rcount
+
+// For checking if nodes are still alive
+unsigned long lastCheck;
+const int maxDeadTime = 5000; // Milliseconds
+
+// Cyclic redundancy check
+const uint8_t crcKey = 7;
+CRC8 crc = CRC8(crcKey);
+
+// This module handles lighting up pins
 ConfigurationFinder cf = ConfigurationFinder(4,5,6,7); // UP, RIGHT, DOWN, LEFT
 
-StaticJsonDocument<256> doc; //256 is the RAM allocated to this document.
+// Write json to serial
+StaticJsonDocument<128> doc; //256 is the RAM allocated to this document.
 
-PJONSoftwareBitBang bus;
-const int masterId = 254;
+// PJON Communication
+PJONSoftwareBitBang bus(254); // 254 is the master id
 const int communicationPin = 12;
 const int outputPin = 11;
 const int inputPin = 12;
 
-// Make a own class for component making and checking
-// Modulemaker or something
-
-// Have this serial sending as it's own class also?
-
-// Master could have one internal component module
+// Masters components
 Button buttons[2] = {Button(2,0), Button(3,1)};
 RotaryEncoder rotEncoder = RotaryEncoder(8,9,0);
 
+// This function is called whenever data is received
+// Other than component data should be send as a array so that first index is the type of the msg
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &info) {
-
-    if (char(payload[0]) == 'O') {
-       Serial.println("Received from slave"); 
-       return;
+    if (char(payload[0]) == 'C') { // OK Slave received data in configuration state and send component info
+       nodes[nextId].potentiometers = payload[1]; // pots
+       nodes[nextId].rotaries = payload[2]; // Rots
+       nodes[nextId].buttons = payload[3]; // Buttons
     }
-    else {
-      String id;
-      for (int i = 0; i < 6; ++i) {
-        id += info.tx.mac[i];
-      }
+    else if (char(payload[0]) == 'A' && length == 2) { //Alive
+      uint8_t nodeId = payload[1];
+      Serial.print(nodeId);
+      Serial.println(" IS ALIVE");
+      nodes[nodeId].lastAlive = millis();
+    }
+    else { // Slave is sending data
       Data data;
       memcpy(&data, payload, sizeof(data));
-      doc[id][String(data.type)][String(data.id)] = data.value;
+      nodes[data.nodeId].lastAlive = millis(); // Must be alive since sending data
+      doc[String(data.nodeId)][String(data.type)][String(data.id)] = data.value;
       writeJsonToSerial();
     }
 };
 
-uint8_t getComponentCount(String id) {
-    uint8_t componentCount = 0;
-    JsonObject node = doc[id].as<JsonObject>();
-    for (JsonPair kv : node) {
-      String compType = kv.key().c_str();
-      componentCount += doc[id][compType].size();
-    }
-    return componentCount;
-}
-
+// Write the json with the crc checksum to serial
 void writeJsonToSerial(){
    String json;
    serializeJson(doc, json);
@@ -80,54 +93,38 @@ void writeJsonToSerial(){
    Serial.println(crc8); // Add crc checksum 
 }
 
+// Initial configurations
 void configuration() {
     uint8_t dir = stack[stackTop][1];
     if (dir == 4) {
       if (stackTop == 0) { // Master checked all its directions
         Serial.println("Configuration done");
-        for (int i = 0; i < 32; ++i) {
-          if ( i == 0 || positions[i] > 0) {
-            Serial.print("Node with id: ");
-            Serial.print(i);
-            Serial.print(" is in position: ");
-            String pos = getPosition(positions[i]);
-            for (int i = pos.length()-2; i >= 0; i--){
-              if (pos[i] == '0') Serial.print("UP ");
-              else if (pos[i] == '1') Serial.print("RIGHT ");
-              else if (pos[i] == '2') Serial.print("DOWN ");
-              else Serial.print("LEFT ");
-            }
-            Serial.println();
-          }
-        }
+        printNodeInfo();
       } else { // Slave has checked all its directions
         stackTop--;
- 
       }
       return;
     }
     
     if (stackTop == 0){ // master at top
-      Serial.print("Master light up ");
-      Serial.println(dir);
+      //Serial.print("Master light up ");
+      //Serial.println(dir);
       cf.setPinHigh(dir);
     }
     else { //  slave from stack
-         Serial.print(stack[stackTop][0]);
-         Serial.println(" Slave light up");
+         //Serial.print(stack[stackTop][0]);
+         //Serial.println(" Slave light up");
          uint8_t content[2] = {'N', dir};
          bus.send_packet_blocking(stack[stackTop][0], content, 2); // send instruction to slave
     }
 
-    
-    uint16_t response = bus.receive(500000); // 0.5 seconds
-    if (response == PJON_ACK) { // Someone received the data
-      Serial.println("new slave");
-      positions[nextId] = givePosition();
+    uint16_t response = bus.receive(50000); // 0.05 seconds
+    if (response == PJON_ACK) { // Someone received the data and send responded
+      nodes[nextId].location = givePosition(); // Set a position for the slave
       uint8_t content[2] = {'I', nextId};
       stack[++stackTop][0] = nextId++;
       stack[stackTop][1] = 0;
-      bus.send_packet_blocking(PJON_BROADCAST, content, 2);
+      bus.send_packet_blocking(PJON_BROADCAST, content, 2); // Send the id to the slave
       configuration();
     }
      stack[stackTop][1] = dir + 1;
@@ -148,6 +145,32 @@ int givePosition() {
   return pos;
 }
 
+// temp test function 
+void printNodeInfo() {
+   for (int i = 0; i < maxNodes; ++i) {
+    if (nodes[i].location > 0) { // has a position
+      Serial.print("Node with id: ");
+      Serial.print(i);
+      Serial.print(" is in position: ");
+      String pos = getPosition(nodes[i].location);
+      for (int j = pos.length()-2; j >= 0; j--){
+        if (pos[j] == '0') Serial.print("UP ");
+        else if (pos[j] == '1') Serial.print("RIGHT ");
+        else if (pos[j] == '2') Serial.print("DOWN ");
+        else Serial.print("LEFT ");
+      }
+      Serial.println();
+      Serial.print("PotCount: ");
+      Serial.println(nodes[i].potentiometers);
+      Serial.print("RotCount: ");
+      Serial.println(nodes[i].rotaries);
+      Serial.print("Buttoncount: ");
+      Serial.println(nodes[i].buttons);
+      Serial.println();
+    }
+  }
+}
+
 int power(int base, int exponent) {
   int p = 1;
   for(int i = 0; i < exponent; ++i) {
@@ -156,6 +179,8 @@ int power(int base, int exponent) {
   return p;
 }
 
+// Decimal positions back to 4 base directions
+// Note: is flipped?
 String getPosition(int pos) {
    String directions = "";
    int left = pos / 4;
@@ -169,10 +194,17 @@ String getPosition(int pos) {
    return directions;
 }
 
+bool areAllNodesAlive() {
+  for (int i = 1; i < maxNodes; ++i) {
+    if (nodes[i].location == 0) return true; // All nodes checked
+    if (millis() - nodes[i].lastAlive > maxDeadTime) return false;
+  }
+  return true;
+}
+
 void setup() {
   Serial.begin(9600);
   cf.setPinsInput();
-  bus.set_id(masterId);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
@@ -182,28 +214,28 @@ void loop() {
   if (!interfaceReady) {
     if (Serial.available() > 0) {
       byte b = Serial.read();
-      if (char(b) == 'R') {
+      if (char(b) == 'R') { // Ready on the other side
         bus.send_packet_blocking(PJON_BROADCAST,"L",1);
         Serial.println("Sent L broadcast");
         configuration();
-        //interfaceReady = true;
-        //bus.send_packet(PJON_BROADCAST,"S",1);
+        interfaceReady = true;
+        bus.send_packet_blocking(PJON_BROADCAST, "S",1); // Let the slaves know that configuration is done
+        lastCheck = millis();
       }
     }
     return;
   }
-//  uint8_t values[2];
-//  rotEncoder.getValues(values);
-//  rotary[0] = values[0];
-//  rotary[1] = values[1];
 
+  bus.receive(1500);
+  
   doc["master"]["Accept"] = buttons[0].getValue();
   doc["master"]["Decline"] = buttons[1].getValue();
   doc["master"]["Rotary"] = rotEncoder.getValue();
   
-  if (rotEncoder.hasChanged() || buttons[0].hasChanged() || buttons[1].hasChanged()) { writeJsonToSerial(); }
+  if (rotEncoder.hasChanged() || buttons[0].hasChanged() || buttons[1].hasChanged()) { 
+    writeJsonToSerial(); 
+  }
 
-  bus.receive(1000);
   if (Serial.available() > 0) {
       byte b = Serial.read();
       if (char(b) == 'Q') {
@@ -211,4 +243,13 @@ void loop() {
         bus.send_packet(PJON_BROADCAST,"Q",1); // stop
       }
     }
+
+   if (millis() - lastCheck > maxDeadTime) {
+    lastCheck = millis();
+    bool alive = areAllNodesAlive();
+    if (not alive) {
+      Serial.println("A node disconnected");
+    }
+   }
+   bus.receive(1500);
 };
