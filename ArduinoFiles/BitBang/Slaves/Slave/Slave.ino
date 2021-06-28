@@ -196,7 +196,7 @@ void sendAliveMsg() {
 
 void sendComponentInfo() {
   uint8_t content[4] = {'C', potCount, rotCount, buttonCount}; 
-  bus.send_packet(master, content, 4);
+  bus.send_packet_blocking(master, content, 4);
 }
 
 void loop()

@@ -16,9 +16,9 @@ The json looks something like this
 {
     "master": {"accept": 0, "decline: 1, "rotary":231},
     "1": {"P": {"0": 1021, "1":22}, "B": {"0":1}},
-    "2" {"R"}: {"0": 12}, 
+    "2" {"R": {"0": 12}}, 
 }.
-Here the master has it's base components two buttons and a rotary encoder, every other node can have anything else. In this case we two nodes where the first node has 2 potentiometers and one buttons and the second node only has a rotary encoder. 
+Here the master has it's base components two buttons and a rotary encoder, every other node can have anything else. In this case we have two nodes where the first node has 2 potentiometers with values 1021 and 22 and one button which is pressed down. The second node only has a rotary encoder with a value of 12. 
 
 ## Todo
 * Testing
@@ -28,5 +28,7 @@ Here the master has it's base components two buttons and a rotary encoder, every
 * Disconnected node
     * Master should detect this quicker
     * Actions when disconnection happens
-* Dynamic components, currently one must assign them in code
+* Dynamic components, currently one must assign each connected component manually in code
 
+## Issues
+* Master is using a lot of memory
