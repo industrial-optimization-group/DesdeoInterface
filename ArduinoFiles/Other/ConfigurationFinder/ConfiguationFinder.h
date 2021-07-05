@@ -14,7 +14,9 @@ public:
     ConfigurationFinder(uint8_t t, uint8_t r, uint8_t b, uint8_t l);
     void setPinHigh(direction dir);
     void setPinsInput();
+    void setPinsInput(direction *dirs, uint8_t n);
     bool isAnyPinHigh();
+    bool isPinHigh(direction dir);
 
 private:
     uint8_t _pins[4];

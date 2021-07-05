@@ -15,8 +15,15 @@ void ConfigurationFinder::setPinsInput() {
     }
 }
 
+void ConfigurationFinder::setPinsInput(direction *dirs, uint8_t n) {
+   for (int i = 0; i < n; ++i) {
+       direction dir = dirs[i];
+       pinMode(_pins[dir], INPUT);
+   }
+}
+
+
 void ConfigurationFinder::setPinHigh(direction dir) {
-    setPinsInput();
     pinMode(_pins[dir], OUTPUT);
     digitalWrite(_pins[dir], HIGH);
 }
@@ -26,4 +33,8 @@ bool ConfigurationFinder::isAnyPinHigh() {
         if (digitalRead(_pins[i]) == HIGH) return true;
     }
     return false;
+}
+
+bool ConfigurationFinder::isPinHigh(direction dir) {
+    return digitalRead(_pins[dir]) == HIGH;
 }
