@@ -11,7 +11,7 @@ const uint8_t rotCount = 0;    // Rotary encoders
 const uint8_t buttonCount = 0; // Buttons
 
 const uint8_t potPins[potCount] = {A5};  // The pins the potentiometers are connected
-const uint8_t rotPins[rotCount][2] = {}; // {{8,9}}; // Rotary encoders
+const uint8_t rotPins[rotCount][2] = {};//{{2,3}}; // {{8,9}}; // Rotary encoders
 const uint8_t bPins[buttonCount] = {};   // Buttons
 // Adjust Until here
 
@@ -29,17 +29,15 @@ const uint8_t inputPin = 11;
 const uint8_t master = 254;
 bool interfaceReady = false;
 
-// For alive messages
+// Direction where a node is
 bool directionsToCheck[4];
-unsigned long lastAliveSent;
-int aliveSendInterval = 500; //milliseconds + random(200)
 
 // For setting direction pins and configuration
-ConfigurationFinder cf = ConfigurationFinder(4, 5, 6, 7); // UP, RIGHT, DOWN, LEFT
+ConfigurationFinder cf = ConfigurationFinder(4,5,6,7); // UP, RIGHT, DOWN, LEFT
 bool waitingForLight = false;
 bool latestReceiver = false;
 
-// This is the type of data that is send to the master
+// This is the data structure that is send to the master
 struct Data
 {
   uint8_t nodeId;
@@ -48,67 +46,78 @@ struct Data
   char type;
 };
 
+const char nodeInfo = 'N';
+const char nodeConnected = 'C'; 
+const char nodeDisconnected = 'D';
+const char componentValue = 'V';
+const char start = 'S';
+const char quit = 'Q';
+const char reset = 'R';
+const char idPacket = 'I';
+const char dirInstruction = 'N';
+const char csCompleted = 'O';
+const char dirToCheck = 'D';
+
+
 // Send the Data struct to master
-bool sendData(Data data, bool forceSend = false)
+bool sendData(Data data, bool blocking = false)
 {
   data.nodeId = id;
-  uint16_t packet = forceSend ? bus.send_packet_blocking(master, &data, sizeof(data)) : bus.send_packet(master, &data, sizeof(data));
+  uint16_t packet = blocking ? bus.send_packet_blocking(master, &data, sizeof(data)) : bus.send_packet(master, &data, sizeof(data));
   return (packet != PJON_ACK);
 }
 
 // Check if potentiometers have changed
-void checkPots(bool forceSend = false)
+void checkPots(bool blocking = false)
 {
   for (int i = 0; i < potCount; i++)
   {
     Potentiometer pot = pots[i];
     uint16_t value = pot.getValue();
     pots[i] = pot;
-    if (pot.hasChanged() || forceSend)
+    if (pot.hasChanged() || blocking)
     {
       Data data;
       data.value = value;
       data.id = pot.getId();
       data.type = pot.getType();
-      sendData(data, forceSend);
+      sendData(data, blocking);
     }
   }
 };
 
-void checkRots(bool forceSend = false)
+void checkRots(bool blocking = false)
 {
   for (int i = 0; i < rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
     uint16_t value = rot.getValue();
     rots[i] = rot;
-    if (rot.hasChanged() || forceSend)
+    if (rot.hasChanged() || blocking)
     {
       Data data;
       data.value = value;
       data.id = rot.getId();
       data.type = rot.getType();
-      sendData(data, true);
+      sendData(data, blocking);
     }
   }
 }
 
-void checkButtons(bool forceSend = false)
+void checkButtons(bool blocking = false)
 {
   for (int i = 0; i < buttonCount; i++)
   {
     Button button = buttons[i];
-    //    Value value;
-    //    value.value = button.getValue();
     uint16_t value = button.getValue();
     buttons[i] = button;
-    if (button.hasChanged() || forceSend)
+    if (button.hasChanged() || blocking)
     {
       Data data;
       data.value = value;
       data.id = button.getId();
       data.type = button.getType();
-      sendData(data, forceSend);
+      sendData(data, blocking);
     }
   }
 }
@@ -147,27 +156,23 @@ void setSelfToInitialMode()
 // This function is called whenever a packet is received
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
-  if (char(payload[0]) == 'L')
-  { // initial LAYOUT
-    Serial.println("L");
+  if (char(payload[0]) == start)
+  { // Start configuration state
     cf.setPinsInput();
     waitingForLight = true;
   }
-  else if (char(payload[0]) == 'D') {
+  else if (char(payload[0]) == dirToCheck) {
     uint8_t dir = payload[1];
-    Serial.println(dir);
     directionsToCheck[dir] = true;
   }
-  else if (char(payload[0]) == 'F')
+  else if (char(payload[0]) == reset)
   { // Reset everything
-    Serial.println("F");
     setSelfToInitialMode();
   }
-  else if (char(payload[0]) == 'I' && id == PJON_NOT_ASSIGNED)
+  else if (char(payload[0]) == idPacket && id == PJON_NOT_ASSIGNED)
   { // ID
     if (latestReceiver)
     {
-      Serial.println("Received id");
       latestReceiver = false;
       id = payload[1];
       bus.set_id(id);
@@ -175,22 +180,16 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
       cf.setPinsInput(); // Set back to input mode. In case disconnecting happens
     }
   }
-  else if (char(payload[0]) == 'N')
+  else if (char(payload[0]) == dirInstruction)
   { // New instructions
     uint8_t dir = payload[1];
-    Serial.println("Received direction");
     cf.setPinsInput(); // Reset pins first
     cf.setPinHigh(dir);
   }
-  else if (char(payload[0]) == 'S') 
-  { // SEND data, interface is ready and configured
-    //lastAliveSent = millis();
+  else if (char(payload[0]) == csCompleted) 
+  { // CS completed, interface is ready and configured
     setDirectionPins();
     interfaceReady = true;
-  }
-  else if (char(payload[0]) == 'Q')
-  { // QUIT
-    interfaceReady = false;
   }
   else
   {
@@ -202,8 +201,6 @@ void setDirectionPins() {
   cf.setPinsInput();
   for (int i = 0; i < 4; ++i) {
     if (!directionsToCheck[i]) {
-      Serial.print("Setting pin ");
-      Serial.println(i);
       cf.setPinHigh(i);
     }
   }
@@ -211,14 +208,13 @@ void setDirectionPins() {
 
 void setup()
 {
-  Serial.begin(9600);
-  randomSeed(analogRead(A0));
-  aliveSendInterval += random(200);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
-  bus.send_packet_blocking(master, "H", 1); 
+  uint8_t packet[1] = {nodeConnected};
+  bus.send_packet_blocking(master, packet, 1); 
 
+  // Initialize each component
   for (int i = 0; i < potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
@@ -241,12 +237,9 @@ void setup()
   }
 }
 
-void sendAliveMsg()
-{
-  uint8_t content[2] = {'A', id};
-  bus.send_packet_blocking(master, content, 2);
-}
-
+// Check for directions which have a node
+// Return a disconnected node id if one found
+// else -1 indicating everything is fine
 int8_t checkNodes() {
   for (int i = 0; i < 4; ++i) {
     if (directionsToCheck[i]) {
@@ -256,9 +249,10 @@ int8_t checkNodes() {
   return -1;
 }
 
+// Send initial info
 void sendComponentInfo()
 {
-  uint8_t content[4] = {'C', potCount, rotCount, buttonCount};
+  uint8_t content[4] = {nodeInfo, potCount, rotCount, buttonCount};
   bus.send_packet_blocking(master, content, 4);
 }
 
@@ -278,12 +272,7 @@ void loop()
     }
     return;
   }
-//  
-//  if (millis() - lastAliveSent > aliveSendInterval)
-//  {
-//    lastAliveSent = millis();
-//    sendAliveMsg();
-//  } 
+
   bus.receive(1500);
   checkPots(); //ADC
   bus.receive(1500);
@@ -293,8 +282,7 @@ void loop()
     int8_t disconnectedNode = checkNodes();
     if (disconnectedNode >= 0) {
       directionsToCheck[disconnectedNode] = false;
-      uint8_t content[3] = {'D', id, disconnectedNode};
+      uint8_t content[3] = {nodeDisconnected, id, disconnectedNode};
       bus.send_packet_blocking(master, content, 3);
   }
-  //    checkComponents();
 };

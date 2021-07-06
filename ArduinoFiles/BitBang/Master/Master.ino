@@ -6,6 +6,19 @@
 #define PJON_INCLUDE_MAC
 #include <PJONSoftwareBitBang.h>
 
+// more than 150 will cause memory issues
+const uint8_t maxNodes = 128;
+
+// Is used for the stack in the configuration stage
+typedef struct
+{
+  uint8_t nodeId;
+  uint8_t dir = 0;
+} stackPair;
+
+// Direction with nodes to check if alive
+bool directionToCheck[4];
+
 // Whenever a value changes a this struct is send to master
 struct Data
 {
@@ -15,16 +28,6 @@ struct Data
   char type;
 };
 
-// Is used for the stack in the configuration stage
-typedef struct
-{
-  uint8_t nodeId;
-  uint8_t dir = 0;
-} stackPairs;
-
-// more than 150 will cause memory issues
-const uint8_t maxNodes = 128;
-
 // For configuration
 bool interfaceReady = false;
 bool packetReceived = false;
@@ -32,18 +35,11 @@ uint8_t nextId = 1; // upto 253, Do not start from 0 as that is for broadcasting
 uint8_t stackTop = 0; // master at bottom
 String currentPos = ""; // Keep track of the current position we're in the configuration stage
 
-
-// For checking if nodes are still alive
-bool directionsToCheck[4];
-unsigned long lastAlive[maxNodes]; // index = id - 1
-unsigned long lastCheck;
-const int maxDeadTime = 5000; // Milliseconds
-
 // For cyclic redundancy check
 const uint8_t crcKey = 7; // This key has to be same on both sides
 CRC8 crc = CRC8(crcKey);
 
-// This module handles lighting up pins
+// This module handles direction pins
 ConfigurationFinder cf = ConfigurationFinder(4, 5, 6, 7); // UP, RIGHT, DOWN, LEFT
 
 // PJON Communication
@@ -55,14 +51,43 @@ const int inputPin = 12;
 Button buttons[2] = {Button(2, 0), Button(3, 1)};
 RotaryEncoder rotEncoder = RotaryEncoder(8, 9, 0);
 
+// Communication packet ids. These could also be their own module as they are somewhat shared
+const char nodeInfo = 'N';
+const char nodeConnected = 'C'; 
+const char nodeDisconnected = 'D';
+const char componentValue = 'V';
+const char start = 'S';
+const char quit = 'Q';
+const char reset = 'R';
+const char idToNode = 'I';
+const char dirInstruction = 'N';
+const char csCompleted = 'O';
+const char dirToCheck = 'D';
+
+
+// Convert Data type to string
+String dataToString(Data data)
+{
+  String dataS = "V "; // Values
+  dataS += data.nodeId;
+  dataS += ":";
+  dataS += data.type;
+  dataS += ":";
+  dataS += data.id;
+  dataS += ":";
+  dataS += data.value;
+  return dataS;
+}
+
 // This function is called whenever data is received
 // Other than component data should be send as a array so that first index is the type of the msg
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &info)
 {
-  if (char(payload[0]) == 'C') 
-  { // OK Slave received data in configuration state and send component info
+  if (char(payload[0]) == nodeInfo) 
+  { // OK: Node received data in configuration state and send component info
     packetReceived = true;
-    String info = "";
+    String info = String(nodeInfo);
+    info += " ";
     info += nextId;
     info += ":";
     for (int i = 1; i < length; ++i)
@@ -74,27 +99,27 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
     info += " ";
     toSerialWithCRC(info);
   }
-  else if (char(payload[0]) == 'A' && length == 2 && interfaceReady)
-  { // Slave sends an alive message
-    uint8_t nodeId = payload[1];
-    Serial.print(nodeId);
-    Serial.println(" IS ALIVE");
-    lastAlive[nodeId - 1] = millis(); // Update last alive time for the slave
-  }
-  else if (char(payload[0]) == 'H' && interfaceReady)
-  {
+  else if (char(payload[0]) == nodeConnected && interfaceReady)
+  { // A node connected
     interfaceReady = false;
-    Serial.println("Slave connected");
     runConfiguration();
   }
-  else if (char(payload[0]) == 'D' && interfaceReady) {
-    Serial.println("Slave disconnected");
+  else if (char(payload[0]) == nodeDisconnected && interfaceReady)
+  { // A node disconnected
+    uint8_t nodeId = payload[1];
+    uint8_t dir = payload[2];
+    String info = String(nodeDisconnected);
+    info += " ";
+    info += nodeId;
+    info += ":";
+    info += dir;
+    info += " ";
+    toSerialWithCRC(info);
   }
   else if (interfaceReady)
-  { // Slave is sending data
+  { // Node sending data
     Data data;
     memcpy(&data, payload, sizeof(data));
-    lastAlive[data.nodeId - 1] = millis(); // Must be alive since sending data
     String dataS = dataToString(data);
     toSerialWithCRC(dataS);
   }
@@ -108,49 +133,38 @@ void toSerialWithCRC(String s) {
    Serial.println(crc8);
 }
 
-// Write data to serial with the crc8 checksum, each dataentry seperated by a colon ':'
-// and crc checksum at the end, seperated with a space ' '
-String dataToString(Data data)
-{
-  String dataS = "";
-  dataS += data.nodeId;
-  dataS += ":";
-  dataS += data.type;
-  dataS += ":";
-  dataS += data.id;
-  dataS += ":";
-  dataS += data.value;
-  return dataS;
-}
 
 void runConfiguration() 
 {
   // Make sure base values are correct, incase running configuration again
-  bus.send_packet_blocking(PJON_BROADCAST, "F", 1); // Make sure slaves also reset their attributes
+  uint8_t packet[1] = {reset};
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1); // Make sure slaves also reset their attributes
   interfaceReady = false;
   nextId = 1;
   stackTop = 0;
   
-  bus.send_packet_blocking(PJON_BROADCAST, "L", 1);
-  Serial.println("Sent L broadcast");
+  packet[0] = start;
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
   
-  stackPairs stack[maxNodes]; // Use this array like a stack.
+  stackPair stack[maxNodes]; // Use this array like a stack.
   configuration(stack);
-  
+
   interfaceReady = true;
   cf.setPinsInput();
+  
   // Let the slaves know that configuration is done
-  bus.send_packet_blocking(PJON_BROADCAST, "S", 1); 
-  lastCheck = millis();
+  packet[0] = csCompleted;
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1); 
 }
 
-// Initial configuration
+// Initial configuration: Assign ids dynamically to nodes,
+// and find their positions
 // stack: Initally this is a array where all pairs are equal to (0,0)
 // The stack will be updated as the configuration continues
-void configuration(stackPairs stack[maxNodes])
+void configuration(stackPair stack[maxNodes])
 {
   uint8_t dir = stack[stackTop].dir;
-  updateCurrentPos(stack); // Set a position for a potential slave
+  updateCurrentPos(stack);
   if (dir == 4) // Invalid direction
   {
     if (stackTop == 0)
@@ -163,15 +177,15 @@ void configuration(stackPairs stack[maxNodes])
     }
     return;
   }
-
   // Direction is valid
+
   if (stackTop == 0)
   { // master at top
     cf.setPinHigh(dir);
   }
   else
   { //  slave from stack
-    uint8_t content[2] = {'N', dir};
+    uint8_t content[2] = {dirInstruction, dir};
     bus.send_packet_blocking(stack[stackTop].nodeId, content, 2); // send instruction to slave
     // The slave will react by setting the corresponding pin to high
   }
@@ -179,13 +193,13 @@ void configuration(stackPairs stack[maxNodes])
   uint16_t response = bus.receive(50000); // 0.05 seconds
   if (response == PJON_ACK)
   { // Someone received the data. The receiver should have the isReceiver set to True now
-    uint8_t content2[2] = {'I', nextId};
+    uint8_t content2[2] = {idToNode, nextId};
      bus.send_packet_blocking(PJON_BROADCAST, content2, 2); // Send the id to the slave
       if (stackTop == 0) {
-        directionsToCheck[dir] = true;
+        directionToCheck[dir] = true;
       } 
       else {
-        uint8_t content1[2] = {'D', dir};
+        uint8_t content1[2] = {directionToCheck, dir};
         bus.send_packet_blocking(stack[stackTop].nodeId, content1, 2);
       }
     
@@ -200,7 +214,7 @@ void configuration(stackPairs stack[maxNodes])
 
 // Update the current position we are checking by going each direction in the stack
 // Starting from the master
-void updateCurrentPos(stackPairs stack[maxNodes])
+void updateCurrentPos(stackPair stack[maxNodes])
 {
   currentPos = ""; // Reset
   for (int i = 0; i <= stackTop; i++)
@@ -219,29 +233,14 @@ int power(int base, int exponent)
   return p;
 }
 
-
-// Check if a node has disconnected
-int8_t hasNodeDisconnected()
-{
-  for (int i = 1; i < nextId; ++i)
-  {
-    //if (nodes[i].location == 0) return true; // All nodes checked
-    if (millis() - lastAlive[i - 1] > maxDeadTime)
-      return i;
-  }
-  return -1;
-}
-
 int8_t checkNodes() {
   for (int i = 0; i < 4; ++i) {
-    if (directionsToCheck[i]) {
+    if (directionToCheck[i]) {
       if (!cf.isPinHigh(i)) return i;
     }
   }
   return -1;
 }
-
-
 
 void setup()
 {
@@ -250,7 +249,9 @@ void setup()
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
-  bus.send_packet_blocking(PJON_BROADCAST, "F", 1);
+  // Make sure that all nodes are reset before starting
+  uint8_t packet[1] = {reset};
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 };
 
 void loop()
@@ -315,31 +316,21 @@ void loop()
     if (char(b) == 'Q')
     {
       interfaceReady = false;
-      Serial.println("STOP");
-      bus.send_packet_blocking(PJON_BROADCAST, "F", 1);
+      uint8_t packet[1] = {reset};
+      bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
       stackTop = 0;
       nextId = 1;
       return;
     }
   }
   bus.receive(1500);
+  // Check if a node has disconnected
   int8_t disconnectedNode = checkNodes();
   if (disconnectedNode >= 0) {
-    directionsToCheck[disconnectedNode] = false;
+    directionToCheck[disconnectedNode] = false;
     Serial.println("Node disconnected");
     Serial.print("Position ");
     Serial.print(disconnectedNode);
     Serial.println("From master");
   }
-//  if (millis() - lastCheck > maxDeadTime)
-//  {
-//    lastCheck = millis();
-//    int8_t disconnected = hasNodeDisconnected();
-//    if (disconnected > 0)
-//    {
-//      Serial.print("Node with id");
-//      Serial.print(disconnected);
-//      Serial.println(" disconnected");
-//    }
-//  }
 };
