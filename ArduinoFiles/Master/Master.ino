@@ -28,6 +28,18 @@ struct Data
   char type;
 };
 
+#define BOUNDS_SIZE 30
+// Sending component bounds to node
+struct Bounds 
+{
+  uint8_t nodeId;
+  char componentType;
+  uint8_t componentId;
+  double minValue;
+  double maxValue;
+  double stepSize;
+};
+
 // For configuration
 bool interfaceReady = false;
 bool packetReceived = false;
@@ -63,6 +75,7 @@ const char idToNode = 'I';
 const char dirInstruction = 'N';
 const char csCompleted = 'O';
 const char dirToCheck = 'D';
+const char bounds = 'B';
 
 
 // Convert Data type to string
@@ -242,6 +255,15 @@ int8_t checkNodes() {
   return -1;
 }
 
+// See if c is written to serial first byte
+char checkSerial() {
+  if (Serial.available() > 0)
+    {
+      return Serial.read();
+    }
+    return 0; // NUL
+}
+
 void setup()
 {
   Serial.begin(9600);
@@ -256,17 +278,13 @@ void setup()
 
 void loop()
 {
+  char serial = checkSerial();
   if (!interfaceReady)
   {
-    if (Serial.available() > 0)
-    {
-      byte b = Serial.read();
-      if (char(b) == 'R')
-      { // Ready on the other side
-        runConfiguration();
-      }
+    if (serial == start) {
+       runConfiguration();
     }
-    return;
+    else return;
   }
 
   bus.receive(1500);
@@ -310,19 +328,43 @@ void loop()
     toSerialWithCRC(s);
   }
 
-  if (Serial.available() > 0)
+  if (serial == quit)
   {
-    byte b = Serial.read();
-    if (char(b) == 'Q')
-    {
       interfaceReady = false;
       uint8_t packet[1] = {reset};
       bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
       stackTop = 0;
       nextId = 1;
       return;
-    }
-  }
+ }
+
+ if (serial == bounds)
+ {
+  Bounds bounds;
+  char input[BOUNDS_SIZE + 1];
+  byte size = Serial.readBytes(input, BOUNDS_SIZE);
+  // Add the final 0 to end the C string
+  input[size] = 0;
+
+  // Read each value
+  char* val = strtok(input, ":");
+  bounds.nodeId = atoi(val);
+  val = strtok(0, ":");
+  bounds.componentType = val;
+  val = strtok(0, ":");
+  bounds.componentId = atoi(val);
+  val = strtok(0, ":");
+  bounds.minValue = atof(val);
+  val = strtok(0, ":");
+  bounds.maxValue = atof(val);
+  Serial.println(atof(val));
+  val = strtok(0, ":");
+  bounds.stepSize = atof(val);    
+
+  Serial.println(bounds.maxValue);
+  
+ }
+ 
   bus.receive(1500);
   // Check if a node has disconnected
   int8_t disconnectedNode = checkNodes();
