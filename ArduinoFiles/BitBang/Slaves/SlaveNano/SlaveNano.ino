@@ -33,7 +33,7 @@ bool interfaceReady = false;
 bool directionsToCheck[4];
 
 // For setting direction pins and configuration
-ConfigurationFinder cf = ConfigurationFinder(7,15,14,16); // UP, RIGHT, DOWN, LEFT
+ConfigurationFinder cf = ConfigurationFinder(7,5,6,9); // UP, RIGHT, DOWN, LEFT
 bool waitingForLight = false;
 bool latestReceiver = false;
 
