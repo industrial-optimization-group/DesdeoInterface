@@ -14,10 +14,14 @@ class RotaryEncoder: public Component
         RotaryEncoder() {}
         RotaryEncoder(int pin1, int pin2, uint8_t id);
         void getValues(uint8_t *arr);
-        uint16_t getValue();
+        void setBounds(double max, double min, double stepSize);
+        double getValue();
     private:
         int _pin0;
         int _pin1;
+        double _stepSize = 1;
+        double _min = 0;
+        double _max = 100;
         bool _prevState;
 };
 

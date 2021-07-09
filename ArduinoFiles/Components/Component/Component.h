@@ -15,11 +15,11 @@ public:
     bool hasChanged();
     uint8_t getId();
     char getType();
-    virtual uint16_t getValue() = 0;
+    virtual double getValue() = 0;
 
 protected:
     bool _hasChanged;
-    uint16_t _prevValue;
+    double _prevValue;
 
 private:
     uint8_t _id;

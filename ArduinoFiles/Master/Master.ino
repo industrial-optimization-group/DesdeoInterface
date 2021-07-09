@@ -23,7 +23,7 @@ bool directionToCheck[4];
 struct Data
 {
   uint8_t nodeId;
-  uint16_t value;
+  double value;
   uint8_t id;
   char type;
 };
@@ -32,7 +32,6 @@ struct Data
 // Sending component bounds to node
 struct Bounds 
 {
-  uint8_t nodeId;
   char componentType;
   uint8_t componentId;
   double minValue;
@@ -130,7 +129,7 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
     toSerialWithCRC(info);
   }
   else if (interfaceReady)
-  { // Node sending data
+  { // Node sending data, figure out a better way
     Data data;
     memcpy(&data, payload, sizeof(data));
     String dataS = dataToString(data);
@@ -264,6 +263,10 @@ char checkSerial() {
     return 0; // NUL
 }
 
+void sendBounds(Bounds bounds, uint8_t nodeId) {
+  bus.send_packet_blocking(nodeId, &bounds, sizeof(bounds));
+}
+
 void setup()
 {
   Serial.begin(9600);
@@ -339,7 +342,7 @@ void loop()
  }
 
  if (serial == bounds)
- {
+ { // Parse the string
   Bounds bounds;
   char input[BOUNDS_SIZE + 1];
   byte size = Serial.readBytes(input, BOUNDS_SIZE);
@@ -348,21 +351,20 @@ void loop()
 
   // Read each value
   char* val = strtok(input, ":");
-  bounds.nodeId = atoi(val);
+  uint8_t nodeId = atoi(val);
   val = strtok(0, ":");
-  bounds.componentType = val;
+  bounds.componentType = val[0];
   val = strtok(0, ":");
   bounds.componentId = atoi(val);
   val = strtok(0, ":");
   bounds.minValue = atof(val);
   val = strtok(0, ":");
   bounds.maxValue = atof(val);
-  Serial.println(atof(val));
   val = strtok(0, ":");
-  bounds.stepSize = atof(val);    
-
-  Serial.println(bounds.maxValue);
-  
+  bounds.stepSize = atof(val);
+  Serial.println("Sending");
+  sendBounds(bounds, nodeId);
+  Serial.println("Sent");
  }
  
   bus.receive(1500);

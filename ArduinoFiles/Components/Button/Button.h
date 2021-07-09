@@ -13,7 +13,7 @@ class Button: public Component
 public:
     Button() {}
     Button( int pin, uint8_t id);
-    uint16_t getValue();
+    double getValue();
 
 private:
     int _pin;

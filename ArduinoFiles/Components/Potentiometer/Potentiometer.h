@@ -13,12 +13,15 @@ class Potentiometer: public Component
 public:
     Potentiometer() {}
     Potentiometer(int analogPin, uint8_t id);
-    uint16_t getValue();
+    double getValue();
+    void setBounds(double max, double min);
 
 private:
     uint16_t filter(uint16_t value);
+    double scale(double value, double min, double max);
     int _pin;
-    
+    double _min = 0;
+    double _max = 0;
 };
 
 #endif

@@ -11,7 +11,7 @@ const uint8_t rotCount = 1;    // Rotary encoders
 const uint8_t buttonCount = 0; // Buttons
 
 const uint8_t potPins[potCount] = {};  // The pins the potentiometers are connected
-const uint8_t rotPins[rotCount][2] = {{2,3}}; // {{8,9}}; // Rotary encoders
+const uint8_t rotPins[rotCount][2] = {2,3};//{{2,3}}; // {{8,9}}; // Rotary encoders
 const uint8_t bPins[buttonCount] = {};   // Buttons
 // Adjust Until here
 
@@ -34,6 +34,7 @@ bool directionsToCheck[4];
 
 // For setting direction pins and configuration
 ConfigurationFinder cf = ConfigurationFinder(7,15,14,16); // UP, RIGHT, DOWN, LEFT
+//ConfigurationFinder cf = ConfigurationFinder(7,5,6,9);  // for nanos
 bool waitingForLight = false;
 bool latestReceiver = false;
 
@@ -41,9 +42,18 @@ bool latestReceiver = false;
 struct Data
 {
   uint8_t nodeId;
-  uint16_t value;
+  double value;
   uint8_t id;
   char type;
+};
+
+struct Bounds 
+{
+  char componentType;
+  uint8_t componentId;
+  double minValue;
+  double maxValue;
+  double stepSize;
 };
 
 const char nodeInfo = 'N';
@@ -57,7 +67,6 @@ const char idPacket = 'I';
 const char dirInstruction = 'N';
 const char csCompleted = 'O';
 const char dirToCheck = 'D';
-
 
 // Send the Data struct to master
 bool sendData(Data data, bool blocking = false)
@@ -73,7 +82,7 @@ void checkPots(bool blocking = false)
   for (int i = 0; i < potCount; i++)
   {
     Potentiometer pot = pots[i];
-    uint16_t value = pot.getValue();
+    double value = pot.getValue();
     pots[i] = pot;
     if (pot.hasChanged() || blocking)
     {
@@ -91,7 +100,7 @@ void checkRots(bool blocking = false)
   for (int i = 0; i < rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
-    uint16_t value = rot.getValue();
+    double value = rot.getValue();
     rots[i] = rot;
     if (rot.hasChanged() || blocking)
     {
@@ -109,7 +118,7 @@ void checkButtons(bool blocking = false)
   for (int i = 0; i < buttonCount; i++)
   {
     Button button = buttons[i];
-    uint16_t value = button.getValue();
+    double value = button.getValue();
     buttons[i] = button;
     if (button.hasChanged() || blocking)
     {
@@ -156,6 +165,7 @@ void setSelfToInitialMode()
 // This function is called whenever a packet is received
 void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
+    Bounds bounds;
   if (char(payload[0]) == start)
   { // Start configuration state
     cf.setPinsInput();
@@ -192,8 +202,14 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
     interfaceReady = true;
   }
   else
-  {
-    return;
+  { // Bounds struct
+    memcpy(&bounds, payload, sizeof(bounds));
+    if (bounds.componentType == 'R') {
+      rots[bounds.componentId].setBounds(bounds.minValue, bounds.maxValue, bounds.stepSize);
+    }
+    else if (bounds.componentType == 'P') {
+      pots[bounds.componentId].setBounds(bounds.minValue, bounds.maxValue);
+    }
   }
 }
 
@@ -208,6 +224,7 @@ void setDirectionPins() {
 
 void setup()
 {
+  Serial.begin(9600);
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
   bus.set_receiver(receiver_function);
