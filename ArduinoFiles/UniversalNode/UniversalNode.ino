@@ -1,23 +1,33 @@
+#include <Datatypes.h>
+#include <EEPROM.h>
 #include <ConfiguationFinder.h>
 #include <Component.h>
 #include <Potentiometer.h>
 #include <RotaryEncoder.h>
 #include <Button.h>
 #include <PJONSoftwareBitBang.h>
-//Setup w universal
-// Adjust these values depending on the node
-const uint8_t potCount = 0;    // How many potentiometers are connected to the node
-const uint8_t rotCount = 1;    // Rotary encoders
-const uint8_t buttonCount = 0; // Buttons
+#define SERIAL_SIZE 30
 
-const uint8_t potPins[potCount] = {};  // The pins the potentiometers are connected
-const uint8_t rotPins[rotCount][2] = {{2,3}}; // {{8,9}}; // Rotary encoders
-const uint8_t bPins[buttonCount] = {};   // Buttons
-// Adjust Until here
+struct MyEeprom 
+{
+  bool configured;
+  bool isMaster;
+  uint8_t type;
+};
 
-Potentiometer pots[potCount];
-RotaryEncoder rots[rotCount];
-Button buttons[buttonCount];
+node n;
+bool isMaster = false; // TODO check if multiple masters?
+bool configured = false;
+
+// max 3 of each
+const uint8_t maxComponents = 3;
+const uint8_t potPins[maxComponents] = {A0, A2, A3};  // The pins the potentiometers are connected
+const uint8_t rotPins[maxComponents][2] = {{2,3}, {4,5}, {6,7}};
+const uint8_t bPins[maxComponents] = {8,9,10};   // Buttons
+
+Potentiometer pots[maxComponents];
+RotaryEncoder rots[maxComponents];
+Button buttons[maxComponents];
 //const uint8_t compCount =  potCount + rotCount + buttonCount;
 //Component components[compCount];
 
@@ -56,6 +66,7 @@ struct Bounds
   double stepSize;
 };
 
+const char configure = 'F';
 const char nodeInfo = 'N';
 const char nodeConnected = 'C'; 
 const char nodeDisconnected = 'D';
@@ -68,6 +79,36 @@ const char dirInstruction = 'N';
 const char csCompleted = 'O';
 const char dirToCheck = 'D';
 
+
+void loadValues() 
+{
+ MyEeprom epr;
+ EEPROM.get(0, epr);
+ if (!epr.configured)
+ {
+  Serial.println("Configure this node with a command of type 'F isMaster:typeNumber'");
+  return;
+ }
+ configured = true;
+ isMaster = epr.isMaster;
+  n = getNode(epr.type);
+
+ Serial.println("configuration loaded");
+  initializeComponents();
+}
+
+void saveValues(bool isMaster, uint8_t type)
+{
+  MyEeprom epr;
+  epr.configured = true;
+  epr.isMaster = isMaster;
+  // TODO validate type
+  epr.type = type;
+  EEPROM.put(0, epr);
+  Serial.println("Configuration saved");
+  loadValues();
+}
+
 // Send the Data struct to master
 bool sendData(Data data, bool blocking = false)
 {
@@ -79,7 +120,7 @@ bool sendData(Data data, bool blocking = false)
 // Check if potentiometers have changed
 void checkPots(bool blocking = false)
 {
-  for (int i = 0; i < potCount; i++)
+  for (int i = 0; i < n.potCount; i++)
   {
     Potentiometer pot = pots[i];
     double value = pot.getValue();
@@ -97,7 +138,7 @@ void checkPots(bool blocking = false)
 
 void checkRots(bool blocking = false)
 {
-  for (int i = 0; i < rotCount; i++)
+  for (int i = 0; i < n.rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
     double value = rot.getValue();
@@ -115,7 +156,7 @@ void checkRots(bool blocking = false)
 
 void checkButtons(bool blocking = false)
 {
-  for (int i = 0; i < buttonCount; i++)
+  for (int i = 0; i < n.butCount; i++)
   {
     Button button = buttons[i];
     double value = button.getValue();
@@ -161,6 +202,7 @@ void setSelfToInitialMode()
     cf.setPinsInput();
     id = PJON_NOT_ASSIGNED;
     bus.set_id(id);
+    //n = getNode(empty);
 }
 
 // This function is called whenever a packet is received
@@ -224,36 +266,42 @@ void setDirectionPins() {
   }
 }
 
-void setup()
-{
-  Serial.begin(9600);
-  bus.strategy.set_pins(inputPin, outputPin);
-  bus.begin();
-  bus.set_receiver(receiver_function);
-  uint8_t packet[1] = {nodeConnected};
-  bus.send_packet_blocking(master, packet, 1); 
+// Initialize each component
+void initializeComponents() {
 
-  // Initialize each component
-  for (int i = 0; i < potCount; i++)
+  for (int i = 0; i < n.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
     pots[i] = pot;
     //components[i] = pot;
   }
 
-  for (int i = 0; i < rotCount; i++)
+  for (int i = 0; i < n.rotCount; i++)
   {
     RotaryEncoder rot = RotaryEncoder(rotPins[i][0], rotPins[i][1], i);
     rots[i] = rot;
     //components[potCount + i] = rot;
   }
 
-  for (int i = 0; i < buttonCount; i++)
+  for (int i = 0; i < n.butCount; i++)
   {
     Button button = Button(bPins[i], i);
     buttons[i] = button;
     //components[potCount + rotCount + i] = button;
   }
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  loadValues();
+  bus.strategy.set_pins(inputPin, outputPin);
+  bus.begin();
+  bus.set_receiver(receiver_function);
+  uint8_t packet[1] = {nodeConnected};
+  bus.send_packet_blocking(master, packet, 1); 
+
+  //initializeComponents();
 }
 
 // Check for directions which have a node
@@ -271,12 +319,35 @@ int8_t checkNodes() {
 // Send initial info
 void sendComponentInfo()
 {
-  uint8_t content[4] = {nodeInfo, potCount, rotCount, buttonCount};
+  uint8_t content[4] = {nodeInfo, n.potCount, n.rotCount, n.butCount};
   bus.send_packet_blocking(master, content, 4);
+}
+
+// Return the first byte in serial and remove it from there
+// if nothing is available return 0
+char checkSerial() {
+  if (Serial.available() > 0)
+    {
+      return Serial.read();
+    }
+    return 0; // NUL
 }
 
 void loop()
 {
+  char serial = checkSerial();
+  if (serial == configure)
+  {
+      char input[SERIAL_SIZE + 1];
+      byte size = Serial.readBytes(input, SERIAL_SIZE);
+      input[size] = 0;
+      char* val = strtok(input, ":");
+      bool isMaster = atoi(val);
+      val = strtok(0, ":");
+      uint8_t type = atoi(val);
+      saveValues(isMaster, type);
+  }
+  if (!configured) return;
   bus.receive(1500); // It is not guaranteed that slaves will receive the 'Q' command from the master
   if (!interfaceReady)
   {

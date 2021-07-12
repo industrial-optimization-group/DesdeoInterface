@@ -27,7 +27,7 @@ double RotaryEncoder::getValue() {
     return _prevValue;
 }
 
-void RotaryEncoder::setBounds(double max, double min, double stepSize) 
+void RotaryEncoder::setBounds(double min, double max, double stepSize) 
 {
     if (min >= max) return;
     _min = min;

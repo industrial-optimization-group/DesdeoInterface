@@ -3,9 +3,7 @@
 #include <Potentiometer.h>
 #include <Button.h>
 #include <RotaryEncoder.h>
-#define PJON_INCLUDE_MAC
 #include <PJONSoftwareBitBang.h>
-
 // more than 150 will cause memory issues
 const uint8_t maxNodes = 128;
 
@@ -69,7 +67,7 @@ const char nodeDisconnected = 'D';
 const char componentValue = 'V';
 const char start = 'S';
 const char quit = 'Q';
-const char reset = 'R';
+const char reset = 'E';
 const char idToNode = 'I';
 const char dirInstruction = 'N';
 const char csCompleted = 'O';
@@ -80,7 +78,8 @@ const char bounds = 'B';
 // Convert Data type to string
 String dataToString(Data data)
 {
-  String dataS = "V "; // Values
+  String dataS = String(componentValue);
+  dataS += " ";
   dataS += data.nodeId;
   dataS += ":";
   dataS += data.type;
@@ -120,13 +119,7 @@ void receiver_function(uint8_t *payload, uint16_t length, const PJON_Packet_Info
   { // A node disconnected
     uint8_t nodeId = payload[1];
     uint8_t dir = payload[2];
-    String info = String(nodeDisconnected);
-    info += " ";
-    info += nodeId;
-    info += ":";
-    info += dir;
-    info += " ";
-    toSerialWithCRC(info);
+    disconnectedNodeToSerial(nodeId, dir);
   }
   else if (interfaceReady)
   { // Node sending data, figure out a better way
@@ -211,7 +204,7 @@ void configuration(stackPair stack[maxNodes])
         directionToCheck[dir] = true;
       } 
       else {
-        uint8_t content1[2] = {directionToCheck, dir};
+        uint8_t content1[2] = {dirToCheck, dir};
         bus.send_packet_blocking(stack[stackTop].nodeId, content1, 2);
       }
     
@@ -254,7 +247,8 @@ int8_t checkNodes() {
   return -1;
 }
 
-// See if c is written to serial first byte
+// Return the first byte in serial and remove it from there
+// if nothing is available return 0
 char checkSerial() {
   if (Serial.available() > 0)
     {
@@ -265,6 +259,15 @@ char checkSerial() {
 
 void sendBounds(Bounds bounds, uint8_t nodeId) {
   bus.send_packet_blocking(nodeId, &bounds, sizeof(bounds));
+}
+
+void disconnectedNodeToSerial(uint8_t found_id, uint8_t dir) {
+  String s = String(nodeDisconnected);
+  s += " ";
+  s += found_id;
+  s += ":";
+  s += dir;
+  toSerialWithCRC(s);
 }
 
 void setup()
@@ -362,9 +365,7 @@ void loop()
   bounds.maxValue = atof(val);
   val = strtok(0, ":");
   bounds.stepSize = atof(val);
-  Serial.println("Sending");
   sendBounds(bounds, nodeId);
-  Serial.println("Sent");
  }
  
   bus.receive(1500);
@@ -372,9 +373,7 @@ void loop()
   int8_t disconnectedNode = checkNodes();
   if (disconnectedNode >= 0) {
     directionToCheck[disconnectedNode] = false;
-    Serial.println("Node disconnected");
-    Serial.print("Position ");
-    Serial.print(disconnectedNode);
-    Serial.println("From master");
+    disconnectedNodeToSerial(0, disconnectedNode);
   }
+
 };
