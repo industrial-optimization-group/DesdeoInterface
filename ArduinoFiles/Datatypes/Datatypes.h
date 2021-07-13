@@ -20,7 +20,7 @@ typedef struct {
     double minValue;
     double maxValue;
     double stepSize;
-} bounds;
+} bounds_data;
 
 typedef struct
 {
@@ -37,20 +37,21 @@ enum Node {
     display = 5, dualPot = 6
 };
 
-enum Command {
-    configure = 'F';
-    nodeInfo = 'N';
-    nodeConnected = 'C'; 
-    nodeDisconnected = 'D';
-    componentValue = 'V';
-    start = 'S';
-    quit = 'Q';
-    reset = 'E';
-    idPacket = 'I';
-    dirInstruction = 'N';
-    csCompleted = 'O';
-    dirToCheck = 'D';
-};
+
+const char configure = 'F';
+const char nodeInfo = 'N';
+const char nodeConnected = 'C'; 
+const char nodeDisconnected = 'D';
+const char componentValue = 'V';
+const char start = 'S';
+const char quit = 'Q';
+const char reset = 'E';
+const char idPacket = 'I';
+const char dirInstruction = 'N';
+const char csCompleted = 'O';
+const char dirToCheck = 'D';
+const char bounds = 'B';
+
 
 node getNode(Node n)
 {
