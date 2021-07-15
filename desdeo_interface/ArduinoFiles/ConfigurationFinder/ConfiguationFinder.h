@@ -6,17 +6,16 @@ ConfigurationFinder.h - Library for determining the layout of the setup
 #define ConfigurationFinder_h
 
 #include "Arduino.h"
-enum direction {top = 0, right = 1, bottom = 2, left = 3};
 
 class ConfigurationFinder
 {
 public:
     ConfigurationFinder(uint8_t t, uint8_t r, uint8_t b, uint8_t l);
-    void setPinHigh(direction dir);
+    void setPinLow(uint8_t dir);
     void setPinsInput();
-    void setPinsInput(direction *dirs, uint8_t n);
-    bool isAnyPinHigh();
-    bool isPinHigh(direction dir);
+    void setPinsInput(uint8_t *dirs, uint8_t n);
+    bool isAnyPinLow();
+    bool isPinLow(uint8_t dir);
 
 private:
     uint8_t _pins[4];

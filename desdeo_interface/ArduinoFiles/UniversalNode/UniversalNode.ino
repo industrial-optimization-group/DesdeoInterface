@@ -9,7 +9,7 @@
 #include <PJONSoftwareBitBang.h>
 #define SERIAL_SIZE 30
 
-struct MyEeprom 
+struct MyEeprom
 {
   bool configured;
   bool isMaster;
@@ -31,7 +31,7 @@ struct Data
   char type;
 };
 
-//struct Bounds 
+//struct Bounds
 //{
 //  char componentType;
 //  uint8_t componentId;
@@ -42,7 +42,7 @@ struct Data
 
 //const char configure = 'F';
 //const char nodeInfo = 'N';
-//const char nodeConnected = 'C'; 
+//const char nodeConnected = 'C';
 //const char nodeDisconnected = 'D';
 //const char componentValue = 'V';
 //const char start = 'S';
@@ -54,16 +54,15 @@ struct Data
 //const char dirToCheck = 'D';
 //const char bounds = 'B';
 
-
-node n; // TODO should have the isMaster in it
+node n;                // TODO should have the isMaster in it
 bool isMaster = false; // TODO check if multiple masters?
 bool configured = false;
 
-// max 3 of each
-const uint8_t maxComponents = 3;
-const uint8_t potPins[maxComponents] = {A0, A1, A2};  // The pins the potentiometers are connected
-const uint8_t rotPins[maxComponents][2] = {{2,3}, {4,5}, {6,7}};
-const uint8_t bPins[maxComponents] = {10,11,12};   // Buttons
+// max 2 of each, currently not even that
+const uint8_t maxComponents = 2;
+const uint8_t potPins[maxComponents] = {A0, A1}; // The pins the potentiometers are connected
+const uint8_t rotPins[maxComponents][2] = {{2, 3}, {5,6}};
+const uint8_t bPins[maxComponents] = {19, 20}; // Buttons
 
 Potentiometer pots[maxComponents];
 RotaryEncoder rots[maxComponents];
@@ -79,23 +78,23 @@ const uint8_t inputPin = 4;
 const uint8_t masterId = 254;
 bool interfaceReady = false;
 
-// Direction where a node is
+// Directions of known nodes, these will be checked every iterations of loop
 bool directionsToCheck[4];
 
 // For setting direction pins and configuration
 //ConfigurationFinder cf = ConfigurationFinder(7,15,14,16); // UP, RIGHT, DOWN, LEFT
-ConfigurationFinder cf = ConfigurationFinder(7,5,6,9);  // for nanos and unos
+ConfigurationFinder cf = ConfigurationFinder(7, 5, 6, 9); // for nanos and unos
 
 // Slave specific
 bool waitingForLight = false;
 bool latestReceiver = false;
 
 // Master specific:
-// more than 150 will cause memory issues
+// more than 150 will most likely cause memory issues
 const uint8_t maxNodes = 128;
 
 // For configuration finder and dynamic ids
-uint8_t nextId = 1; // upto 253, Do not start from 0 as that is for broadcasting
+uint8_t nextId = 1;   // upto 253, Do not start from 0 as that is for broadcasting
 uint8_t stackTop = 0; // master at bottom
 // TODO currentPos should be byte array
 String currentPos = ""; // Keep track of the current position we're in the configuration stage
@@ -104,7 +103,6 @@ String currentPos = ""; // Keep track of the current position we're in the confi
 const uint8_t crcKey = 7; // This key has to be same on both sides
 CRC8 crc = CRC8(crcKey);
 
-
 // Slave functions:
 
 // This function is called whenever a packet is received
@@ -112,10 +110,11 @@ void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packe
 {
   if (char(payload[0]) == start)
   { // Start configuration state
-        cf.setPinsInput();
-        waitingForLight = true;
+    cf.setPinsInput();
+    waitingForLight = true;
   }
-  else if (char(payload[0]) == dirToCheck) {
+  else if (char(payload[0]) == dirToCheck)
+  {
     uint8_t dir = payload[1];
     directionsToCheck[dir] = true;
   }
@@ -138,9 +137,9 @@ void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packe
   { // New instructions
     uint8_t dir = payload[1];
     cf.setPinsInput(); // Reset pins first
-    cf.setPinHigh(dir);
+    cf.setPinLow(dir);
   }
-  else if (char(payload[0]) == csCompleted) 
+  else if (char(payload[0]) == csCompleted)
   { // CS completed, interface is ready and configured
     setDirectionPins();
     interfaceReady = true;
@@ -149,10 +148,12 @@ void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packe
   { // Bounds struct
     bounds_data b;
     memcpy(&b, payload, sizeof(b));
-    if (b.componentType == 'R') {
+    if (b.componentType == 'R')
+    {
       rots[b.componentId].setBounds(b.minValue, b.maxValue, b.stepSize);
     }
-    else if (b.componentType == 'P') {
+    else if (b.componentType == 'P')
+    {
       pots[b.componentId].setBounds(b.minValue, b.maxValue);
     }
   }
@@ -166,20 +167,20 @@ bool sendData(Data data, bool blocking = false)
   return (packet != PJON_ACK);
 }
 
-
 // should propably reset component bounds as well
-void setSelfToInitialMode() 
+void setSelfToInitialMode()
 {
-    interfaceReady = false;
-    waitingForLight = false;
-    latestReceiver = false;
-    for (int i = 0; i < 4; ++i) {
-       directionsToCheck[i] = false;
-    }
-    cf.setPinsInput();
-    id = PJON_NOT_ASSIGNED;
-    bus.set_id(id);
-    //n = getNode(empty);
+  interfaceReady = false;
+  waitingForLight = false;
+  latestReceiver = false;
+  for (int i = 0; i < 4; ++i)
+  {
+    directionsToCheck[i] = false;
+  }
+  cf.setPinsInput();
+  id = PJON_NOT_ASSIGNED;
+  bus.set_id(id);
+  //n = getNode(empty);
 }
 
 // Send initial info
@@ -189,20 +190,23 @@ void sendComponentInfo()
   bus.send_packet_blocking(masterId, content, 4);
 }
 
-
 // Shared functions
 
-void setDirectionPins() {
+void setDirectionPins()
+{
   cf.setPinsInput();
-  for (int i = 0; i < 4; ++i) {
-    if (!directionsToCheck[i]) {
-      cf.setPinHigh(i);
+  for (int i = 0; i < 4; ++i)
+  {
+    if (!directionsToCheck[i])
+    {
+      cf.setPinLow(i);
     }
   }
 }
 
 // Initialize each component
-void initializeComponents() {
+void initializeComponents()
+{
   for (int i = 0; i < n.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
@@ -226,23 +230,22 @@ void initializeComponents() {
 }
 
 // Load values myEeprom from the EEMPROM and set the values
-void loadValues() 
+void loadValues()
 {
- MyEeprom epr;
- EEPROM.get(0, epr);
- if (!epr.configured)
- {
-  Serial.println("Configure this node with a command of type 'F isMaster:typeNumber'");
-  return;
- }
- configured = true;
- isMaster = epr.isMaster;
+  MyEeprom epr;
+  EEPROM.get(0, epr);
+  if (!epr.configured)
+  {
+    Serial.println("Configure this node with a command of type 'F isMaster:typeNumber'");
+    return;
+  }
+  configured = true;
+  isMaster = epr.isMaster;
   n = getNode(epr.type);
 
- Serial.println("configuration loaded");
+  Serial.println("configuration loaded");
   initializeComponents();
 }
-
 
 // Save node configuration to EEPROM
 void saveValues(bool isMast, uint8_t type)
@@ -271,13 +274,14 @@ void checkPots(bool blocking = false)
       data.value = value;
       data.id = pot.getId();
       data.type = pot.getType();
-      if (isMaster) 
+      if (isMaster)
       {
         data.nodeId = masterId;
         String dataS = dataToString(data);
         toSerialWithCRC(dataS);
       }
-      else sendData(data, blocking);
+      else
+        sendData(data, blocking);
     }
   }
 };
@@ -295,13 +299,14 @@ void checkRots(bool blocking = false)
       data.value = value;
       data.id = rot.getId();
       data.type = rot.getType();
-      if (isMaster) 
+      if (isMaster)
       {
         data.nodeId = masterId;
         String dataS = dataToString(data);
         toSerialWithCRC(dataS);
       }
-      else sendData(data, blocking);
+      else
+        sendData(data, blocking);
     }
   }
 }
@@ -319,13 +324,14 @@ void checkButtons(bool blocking = false)
       data.value = value;
       data.id = button.getId();
       data.type = button.getType();
-      if (isMaster) 
+      if (isMaster)
       {
         data.nodeId = masterId;
         String dataS = dataToString(data);
         toSerialWithCRC(dataS);
       }
-      else sendData(data, blocking);
+      else
+        sendData(data, blocking);
     }
   }
 }
@@ -333,10 +339,14 @@ void checkButtons(bool blocking = false)
 // Check for directions which have a node
 // Return a disconnected node id if one found
 // else -1 indicating everything is fine
-int8_t checkNodes() {
-  for (int i = 0; i < 4; ++i) {
-    if (directionsToCheck[i]) {
-      if (!cf.isPinHigh(i)) return i;
+int8_t checkNodes()
+{
+  for (int i = 0; i < 4; ++i)
+  {
+    if (directionsToCheck[i])
+    {
+      if (!cf.isPinLow(i))
+        return i;
     }
   }
   return -1;
@@ -344,12 +354,13 @@ int8_t checkNodes() {
 
 // Return the first byte in serial and remove it from there
 // if nothing is available return 0
-char checkSerial() {
+char checkSerial()
+{
   if (Serial.available() > 0)
-    {
-      return Serial.read();
-    }
-    return 0; // NUL
+  {
+    return Serial.read();
+  }
+  return 0; // NUL
 }
 
 void setup()
@@ -359,30 +370,29 @@ void setup()
 
   bus.strategy.set_pins(inputPin, outputPin);
   bus.begin();
-  
-  if (isMaster) 
+
+  if (isMaster)
   {
     id = masterId;
     bus.set_receiver(receiver_function_master);
   }
-  else 
+  else
   {
     bus.set_receiver(receiver_function_slave);
   }
-  
+
   bus.set_id(id);
 
-  if (isMaster) 
+  if (isMaster)
   { // Send a reset command to nodes
-      uint8_t packet[1] = {reset};
-      bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
+    uint8_t packet[1] = {reset};
+    bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
   }
   else
   { // Notify master of connecting
     uint8_t packet[1] = {nodeConnected};
-    bus.send_packet_blocking(masterId, packet, 1); 
+    bus.send_packet_blocking(masterId, packet, 1);
   }
-
 }
 
 void loop()
@@ -390,20 +400,24 @@ void loop()
   char serial = checkSerial();
   if (serial == configure)
   {
-      char input[SERIAL_SIZE + 1];
-      byte size = Serial.readBytes(input, SERIAL_SIZE);
-      input[size] = 0;
-      char* val = strtok(input, ":");
-      bool isMaster = atoi(val);
-      val = strtok(0, ":");
-      uint8_t type = atoi(val);
-      saveValues(isMaster, type);
+    char input[SERIAL_SIZE + 1];
+    byte size = Serial.readBytes(input, SERIAL_SIZE);
+    input[size] = 0;
+    char *val = strtok(input, ":");
+    bool isMaster = atoi(val);
+    val = strtok(0, ":");
+    uint8_t type = atoi(val);
+    saveValues(isMaster, type);
   }
-  if (!configured) return;
+  if (!configured)
+    return;
   bus.receive(1500); // It is not guaranteed that slaves will receive the 'Q' command from the master
-  if (isMaster) masterLoop(serial);
-  else slaveLoop();
-  if (!interfaceReady) return;
+  if (isMaster)
+    masterLoop(serial);
+  else
+    slaveLoop();
+  if (!interfaceReady)
+    return;
 
   // Check for changing values in components
   bus.receive(1500);
@@ -414,72 +428,76 @@ void loop()
 
   // Check for disconnected nodes
   int8_t disconnectedNode = checkNodes();
-  if (disconnectedNode >= 0) {
+  if (disconnectedNode >= 0)
+  {
     directionsToCheck[disconnectedNode] = false;
-    if (isMaster) 
+    if (isMaster)
     {
       disconnectedNodeToSerial(0, disconnectedNode);
     }
-    else 
+    else
     {
       uint8_t content[3] = {nodeDisconnected, id, disconnectedNode};
       bus.send_packet_blocking(masterId, content, 3);
     }
-  } 
+  }
 };
 
 void masterLoop(char serial)
 {
   if (!interfaceReady)
   {
-    if (serial == start) {
-       runConfiguration();
+    if (serial == start)
+    {
+      runConfiguration();
     }
-    else return;
+    else
+      return;
   }
 
   if (serial == quit)
   {
-      interfaceReady = false;
-      uint8_t packet[1] = {reset};
-      bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
-      stackTop = 0;
-      nextId = 1;
-      return;
+    interfaceReady = false;
+    uint8_t packet[1] = {reset};
+    bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
+    stackTop = 0;
+    nextId = 1;
+    return;
   }
 
- if (serial == bounds)
- { // Parse the string
-  bounds_data b;
-  char input[SERIAL_SIZE + 1];
-  byte size = Serial.readBytes(input, SERIAL_SIZE);
-  // Add the final 0 to end the C string
-  input[size] = 0;
+  if (serial == bounds)
+  { // Parse the string
+    bounds_data b;
+    char input[SERIAL_SIZE + 1];
+    byte size = Serial.readBytes(input, SERIAL_SIZE);
+    // Add the final 0 to end the C string
+    input[size] = 0;
 
-  // Read each value
-  char* val = strtok(input, ":");
-  uint8_t nodeId = atoi(val);
-  val = strtok(0, ":");
-  b.componentType = val[0];
-  val = strtok(0, ":");
-  b.componentId = atoi(val);
-  val = strtok(0, ":");
-  b.minValue = atof(val);
-  val = strtok(0, ":");
-  b.maxValue = atof(val);
-  val = strtok(0, ":");
-  b.stepSize = atof(val);
-  sendBounds(b, nodeId);
- }
+    // Read each value
+    char *val = strtok(input, ":");
+    uint8_t nodeId = atoi(val);
+    val = strtok(0, ":");
+    b.componentType = val[0];
+    val = strtok(0, ":");
+    b.componentId = atoi(val);
+    val = strtok(0, ":");
+    b.minValue = atof(val);
+    val = strtok(0, ":");
+    b.maxValue = atof(val);
+    val = strtok(0, ":");
+    b.stepSize = atof(val);
+    sendBounds(b, nodeId);
+  }
 }
 
 void slaveLoop()
 {
-  if (interfaceReady)  return;
-  
+  if (interfaceReady)
+    return;
+
   if (waitingForLight)
   {
-    if (cf.isAnyPinHigh())
+    if (cf.isAnyPinLow())
     {
       latestReceiver = true;
       sendComponentInfo();
@@ -491,7 +509,7 @@ void slaveLoop()
 // Master functions:
 void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
-  if (char(payload[0]) == nodeInfo) 
+  if (char(payload[0]) == nodeInfo)
   { // OK: Node received data in configuration state and send component info
     String info = String(nodeInfo);
     info += " ";
@@ -527,7 +545,7 @@ void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Pack
 };
 
 // Configuration checking
-void runConfiguration() 
+void runConfiguration()
 {
   // Make sure base values are correct, incase running configuration again
   uint8_t packet[1] = {reset};
@@ -535,19 +553,19 @@ void runConfiguration()
   interfaceReady = false;
   nextId = 1;
   stackTop = 0;
-  
+
   packet[0] = start;
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
-  
+
   stackPair stack[maxNodes]; // Use this array like a stack.
   configuration(stack);
 
   interfaceReady = true;
   cf.setPinsInput();
-  
+
   // Let the slaves know that configuration is done
   packet[0] = csCompleted;
-  bus.send_packet_blocking(PJON_BROADCAST, packet, 1); 
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 }
 
 // Initial configuration: Assign ids dynamically to nodes,
@@ -574,7 +592,7 @@ void configuration(stackPair stack[maxNodes])
 
   if (stackTop == 0)
   { // master at top
-    cf.setPinHigh(dir);
+    cf.setPinLow(dir);
   }
   else
   { //  slave from stack
@@ -587,18 +605,20 @@ void configuration(stackPair stack[maxNodes])
   if (response == PJON_ACK)
   { // Someone received the data. The receiver should have the isReceiver set to True now
     uint8_t content2[2] = {idPacket, nextId};
-     bus.send_packet_blocking(PJON_BROADCAST, content2, 2); // Send the id to the slave
-      if (stackTop == 0) {
-        directionsToCheck[dir] = true;
-      } 
-      else {
-        uint8_t content1[2] = {dirToCheck, dir};
-        bus.send_packet_blocking(stack[stackTop].nodeId, content1, 2);
-      }
-    
+    bus.send_packet_blocking(PJON_BROADCAST, content2, 2); // Send the id to the slave
+    if (stackTop == 0)
+    {
+      directionsToCheck[dir] = true;
+    }
+    else
+    {
+      uint8_t content1[2] = {dirToCheck, dir};
+      bus.send_packet_blocking(stack[stackTop].nodeId, content1, 2);
+    }
+
     stack[++stackTop].nodeId = nextId++;
     stack[stackTop].dir = 0;
-  
+
     configuration(stack);
   }
   stack[stackTop].dir = dir + 1;
@@ -626,11 +646,13 @@ int power(int base, int exponent)
   return p;
 }
 
-void sendBounds(bounds_data b, uint8_t nodeId) {
+void sendBounds(bounds_data b, uint8_t nodeId)
+{
   bus.send_packet_blocking(nodeId, &b, sizeof(b));
 }
 
-void disconnectedNodeToSerial(uint8_t found_id, uint8_t dir) {
+void disconnectedNodeToSerial(uint8_t found_id, uint8_t dir)
+{
   String s = String(nodeDisconnected);
   s += " ";
   s += found_id;
@@ -654,10 +676,12 @@ String dataToString(Data data)
   return dataS;
 }
 
-void toSerialWithCRC(String s) {
-   uint8_t data[s.length() + 1];
-   s.getBytes(data, s.length() + 1);
-   uint8_t crc8 = crc.getCRC8(data, s.length());
-   Serial.print(s); Serial.print(" ");
-   Serial.println(crc8);
+void toSerialWithCRC(String s)
+{
+  uint8_t data[s.length() + 1];
+  s.getBytes(data, s.length() + 1);
+  uint8_t crc8 = crc.getCRC8(data, s.length());
+  Serial.print(s);
+  Serial.print(" ");
+  Serial.println(crc8);
 }

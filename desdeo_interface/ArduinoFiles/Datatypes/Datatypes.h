@@ -34,7 +34,7 @@ enum Node {
     empty = 0,
     master = 1,
     singlePot = 2, singleRot = 3, singleBut = 4,
-    display = 5, dualPot = 6
+    display = 5, dualRot = 6
 };
 
 
@@ -52,7 +52,7 @@ const char csCompleted = 'O';
 const char dirToCheck = 'D';
 const char bounds = 'B';
 
-
+// Or array of nodes?
 node getNode(Node n)
 {
    node node;
@@ -70,6 +70,8 @@ node getNode(Node n)
         break;
     case singleBut:
         node.butCount = 1;
+    case dualRot:
+        node.rotCount = 2;
     default: // empty
         break;
     }

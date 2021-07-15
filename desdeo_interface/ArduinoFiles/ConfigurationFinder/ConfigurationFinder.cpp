@@ -11,30 +11,30 @@ ConfigurationFinder::ConfigurationFinder(uint8_t top, uint8_t right, uint8_t bot
 
 void ConfigurationFinder::setPinsInput() {
   for (int i = 0; i < 4; ++i) {
-      pinMode(_pins[i], INPUT);
+      pinMode(_pins[i], INPUT_PULLUP);
     }
 }
 
-void ConfigurationFinder::setPinsInput(direction *dirs, uint8_t n) {
+void ConfigurationFinder::setPinsInput(uint8_t *dirs, uint8_t n) {
    for (int i = 0; i < n; ++i) {
-       direction dir = dirs[i];
-       pinMode(_pins[dir], INPUT);
+       uint8_t dir = dirs[i];
+       pinMode(_pins[dir], INPUT_PULLUP);
    }
 }
 
 
-void ConfigurationFinder::setPinHigh(direction dir) {
+void ConfigurationFinder::setPinLow(uint8_t dir) {
     pinMode(_pins[dir], OUTPUT);
-    digitalWrite(_pins[dir], HIGH);
+    digitalWrite(_pins[dir], LOW);
 }
 
-bool ConfigurationFinder::isAnyPinHigh() {
+bool ConfigurationFinder::isAnyPinLow() {
     for (int i = 0; i < 4; ++i) {
-        if (digitalRead(_pins[i]) == HIGH) return true;
+        if (digitalRead(_pins[i]) == LOW) return true;
     }
     return false;
 }
 
-bool ConfigurationFinder::isPinHigh(direction dir) {
-    return digitalRead(_pins[dir]) == HIGH;
+bool ConfigurationFinder::isPinLow(uint8_t dir) {
+    return digitalRead(_pins[dir]) == LOW;
 }
