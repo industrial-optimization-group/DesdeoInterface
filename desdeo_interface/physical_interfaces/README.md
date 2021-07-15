@@ -1,0 +1,2 @@
+Interfaces for each method. Wont work at the moment since the communication protocol has changed.
+In my opinion the interface should be used alongside with the coming web interface but it can also be used through the command line if someone wished to do so.
