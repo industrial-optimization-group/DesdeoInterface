@@ -13,4 +13,4 @@ Whenever a node connects it send a message to the master indicating that is has 
 
 Each node, including the master, has 4 digital pins reserved for each direction (TOP 7, RIGHT 15, BOTTOM 14, LEFT 16) which are used by the configuration checker. Shortly we go node by node checking each direction, for more details check [configuration checker](doc/ConfigurationChecker). In addition to these direction pins each node also needs 2 digital pins (ATmega32u4 supports pins 2,4,8,12) for communication, in 4/out 8. The master communicates through serial so pins tx/rx should be left empty.
 
-![Shcematic of a node](doc/Schematics/node_schematic_v0_1)
+![Shcematic of a node](doc/Schematics/node_schematic_v0_1.png)
