@@ -10,7 +10,7 @@ The direction pin is unique for each connector. This pin is used to:
 * Check if neighboring nodes are still connected
 Digital pins 7, 15, 14, 16 (top, right, bottom, left) are used for the direction pins.
 
-![A node](doc\DirectionPins\connections.svg)
+![A node](doc/DirectionPins/connections.svg)
 
 ### Calculating positions
 For calculating positions of the nodes, the method uses a stack of pairs which is implemented with a struct array called stack. The struct stackPair consist of a node id and the next direction it should check, both are bytes. We keep track of the index of the node highest in the stack in its own variable called stackTop. Initially the stackTop is equal to zero pointing at the master with the masters next direction being 0 (TOP). Every new node entering the stack start with the direction 0. A nodes position is calculated when it is found by going through the stack and checking the directions we have taken. In example if the current stack is{0: LEFT, 3: TOP, 4: TOP, 6: BOTTOM} and a new node is found it must be in position LEFT TOP TOP BOTTOM or 3002. The stack is then updated. This direction is send to serial and it is NOT saved anywhere on the master side.

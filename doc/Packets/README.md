@@ -7,8 +7,6 @@ Each packet is accompanied with a packet id, see below.
 Whenever a packet is received we call the receiver_function, read the packet id and do actions
 depending on the packet id. 
 
-
-
 ## Packet ids
 Make packets identifiable which makes communication between master - pc and master - node simpler. 
 Each packet has an identifier expect those which only contain a struct datatype, see bounds and component value. 
@@ -17,26 +15,6 @@ There's only one unidentified packet per communication direction and therefore i
 
 The nodes read the packet ids from the datatypes.h headerfile which is located in [desdeo_interface/ArduinoFiles/Datatypes](desdeo_interface/ArduinoFiles/Datatypes).
 The ids are checked in the receiver function or the main loop if data is coming from serial.
-
-### Packet ids for serial communication
-Communication between master and pc through serial port. 
-Here S and M stand for Serial port and Master respectively.
-All lines written to serial should be of form "ID dataString CRC".
-
-| ID            | Explanation         | Direction  | dataString         |
-| ------------- | -------------       | -----      | -----              |
-| F*            | Configure node      | M -> S     | isMaster:type      |
-| S             | Start configuration | S -> M     | NONE               |
-| O             | Configuration done  | S -> M     | NONE               |
-| Q             | Quit                | S -> M     | NONE               |
-| R             | Reset               | M -> S     | NONE               |
-| N             | Node info           | M -> S     | id:p:r:b           |
-| C             | Node connected      | M -> S     | NONE               |
-| D             | Node disconnected   | M -> S     | id:dir             |
-| V             | Component value     | M -> S     | nId:type:cId:value |
-| B             | Bounds for node     | M -> S     | nId:               |
-
-*Any node can get the configuration command from serial not only the master!
 
 ### Packet ids for PJON communication
 Communication between master and the slaves with the PJON software bitbang protocol.
