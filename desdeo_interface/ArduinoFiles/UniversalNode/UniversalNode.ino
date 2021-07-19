@@ -16,14 +16,12 @@ bool configured = false;
 // max 2 of each, currently not even that
 const uint8_t maxComponents = 2;
 const uint8_t potPins[maxComponents] = {A0, A1}; // The pins the potentiometers are connected
-const uint8_t rotPins[maxComponents][2] = {{2, 3}, {5,6}};
+const uint8_t rotPins[maxComponents][2] = {{2, 3}, {5,6}}; // Change these to match easyeda
 const uint8_t bPins[maxComponents] = {19, 20}; // Buttons
 
 Potentiometer pots[maxComponents];
 RotaryEncoder rots[maxComponents];
 Button buttons[maxComponents];
-//const uint8_t compCount =  potCount + rotCount + buttonCount;
-//Component components[compCount];
 
 // Communication
 uint8_t id = PJON_NOT_ASSIGNED; // Temporary id, until gets assigned a unique id by the master

@@ -24,6 +24,7 @@ All lines written to serial should be of form "ID dataString CRC".
 | D             | Node disconnected   | M -> S     | id:dir             |
 | V             | Component value     | M -> S     | nId:type:cId:value |
 | B             | Bounds for node     | M -> S     | nId:               |
+
 *Any node can get the configuration command from serial not only the master!
 
 # Packet ids for PJON communication
@@ -45,5 +46,6 @@ the first index is the id of the packet.
 | O             | Configuration done  | M -> S     | NONE           |
 | D             | Direction to check  | M -> S     | [dir]          |
 | B             | Bounds for node     | M -> S     | struct**       |
+
 *Component values are send in a self defined struct datatype which consists of node id (uint8_t), component value (uint16_t), component id (uint8_t) and the component type (char).
 **Bounds are send as struct with values component type, component id, min value, max value, step size. Step size will be ignored for components of type potentiometer 'P'.
