@@ -7,54 +7,9 @@
 #include <Button.h>
 #include <CRC8.h>
 #include <PJONSoftwareBitBang.h>
-#define SERIAL_SIZE 30
+#define SERIAL_SIZE 30 //For receiving more complex data from serial
 
-struct MyEeprom
-{
-  bool configured;
-  bool isMaster;
-  uint8_t type;
-};
-
-typedef struct
-{
-  uint8_t nodeId;
-  uint8_t dir = 0;
-} stackPair;
-
-// This is the data structure that is send to the master
-struct Data
-{
-  uint8_t nodeId;
-  double value;
-  uint8_t id;
-  char type;
-};
-
-//struct Bounds
-//{
-//  char componentType;
-//  uint8_t componentId;
-//  double minValue;
-//  double maxValue;
-//  double stepSize;
-//};
-
-//const char configure = 'F';
-//const char nodeInfo = 'N';
-//const char nodeConnected = 'C';
-//const char nodeDisconnected = 'D';
-//const char componentValue = 'V';
-//const char start = 'S';
-//const char quit = 'Q';
-//const char reset = 'E';
-//const char idPacket = 'I';
-//const char dirInstruction = 'N';
-//const char csCompleted = 'O';
-//const char dirToCheck = 'D';
-//const char bounds = 'B';
-
-node n;                // TODO should have the isMaster in it
+NodeType nt;
 bool isMaster = false; // TODO check if multiple masters?
 bool configured = false;
 
@@ -146,7 +101,7 @@ void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packe
   }
   else
   { // Bounds struct
-    bounds_data b;
+    BoundsData b;
     memcpy(&b, payload, sizeof(b));
     if (b.componentType == 'R')
     {
@@ -186,8 +141,8 @@ void setSelfToInitialMode()
 // Send initial info
 void sendComponentInfo()
 {
-  uint8_t content[4] = {nodeInfo, n.potCount, n.rotCount, n.butCount};
-  bus.send_packet_blocking(masterId, content, 4);
+  uint8_t content[2] = {nodeInfo, nt};
+  bus.send_packet_blocking(masterId, content, 2);
 }
 
 // Shared functions
@@ -207,21 +162,22 @@ void setDirectionPins()
 // Initialize each component
 void initializeComponents()
 {
-  for (int i = 0; i < n.potCount; i++)
+  ComponentCounts c = getCounts(nt);
+  for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
     pots[i] = pot;
     //components[i] = pot;
   }
 
-  for (int i = 0; i < n.rotCount; i++)
+  for (int i = 0; i < c.rotCount; i++)
   {
     RotaryEncoder rot = RotaryEncoder(rotPins[i][0], rotPins[i][1], i);
     rots[i] = rot;
     //components[potCount + i] = rot;
   }
 
-  for (int i = 0; i < n.butCount; i++)
+  for (int i = 0; i < c.butCount; i++)
   {
     Button button = Button(bPins[i], i);
     buttons[i] = button;
@@ -241,7 +197,7 @@ void loadValues()
   }
   configured = true;
   isMaster = epr.isMaster;
-  n = getNode(epr.type);
+  nt = epr.type;
 
   Serial.println("configuration loaded");
   initializeComponents();
@@ -253,7 +209,6 @@ void saveValues(bool isMast, uint8_t type)
   MyEeprom epr;
   epr.configured = true;
   epr.isMaster = isMast;
-  // TODO validate type
   epr.type = type;
   EEPROM.put(0, epr);
   Serial.println("Configuration saved");
@@ -263,7 +218,8 @@ void saveValues(bool isMast, uint8_t type)
 // Check if potentiometers have changed
 void checkPots(bool blocking = false)
 {
-  for (int i = 0; i < n.potCount; i++)
+  ComponentCounts c = getCounts(nt);
+  for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = pots[i];
     double value = pot.getValue();
@@ -288,7 +244,8 @@ void checkPots(bool blocking = false)
 
 void checkRots(bool blocking = false)
 {
-  for (int i = 0; i < n.rotCount; i++)
+  ComponentCounts c = getCounts(nt);
+  for (int i = 0; i < c.rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
     double value = rot.getValue();
@@ -313,7 +270,8 @@ void checkRots(bool blocking = false)
 
 void checkButtons(bool blocking = false)
 {
-  for (int i = 0; i < n.butCount; i++)
+  ComponentCounts c = getCounts(nt);
+  for (int i = 0; i < c.butCount; i++)
   {
     Button button = buttons[i];
     double value = button.getValue();
@@ -467,7 +425,7 @@ void masterLoop(char serial)
 
   if (serial == bounds)
   { // Parse the string
-    bounds_data b;
+    BoundsData b;
     char input[SERIAL_SIZE + 1];
     byte size = Serial.readBytes(input, SERIAL_SIZE);
     // Add the final 0 to end the C string
@@ -515,17 +473,15 @@ void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Pack
     info += " ";
     info += nextId;
     info += ":";
-    for (int i = 1; i < length; ++i)
-    { // Print all send info to serial seperated by spaces
-      info += payload[i];
-      info += ":";
-    }
+    info += payload[1];
+    info += ":";
     info += (currentPos);
     info += " ";
     toSerialWithCRC(info);
   }
   else if (char(payload[0]) == nodeConnected && interfaceReady)
   { // A node connected
+    Serial.println(nodeConnected);
     interfaceReady = false;
     runConfiguration();
   }
@@ -557,7 +513,7 @@ void runConfiguration()
   packet[0] = start;
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 
-  stackPair stack[maxNodes]; // Use this array like a stack.
+  StackPair stack[maxNodes]; // Use this array like a stack.
   configuration(stack);
 
   interfaceReady = true;
@@ -572,7 +528,7 @@ void runConfiguration()
 // and find their positions
 // stack: Initally this is a array where all pairs are equal to (0,0)
 // The stack will be updated as the configuration continues
-void configuration(stackPair stack[maxNodes])
+void configuration(StackPair stack[maxNodes])
 {
   uint8_t dir = stack[stackTop].dir;
   updateCurrentPos(stack);
@@ -580,7 +536,7 @@ void configuration(stackPair stack[maxNodes])
   {
     if (stackTop == 0)
     { // Master checked all its directions
-      Serial.println("Configuration done");
+      Serial.println("O");
     }
     else
     { // Slave has checked all its directions
@@ -627,7 +583,7 @@ void configuration(stackPair stack[maxNodes])
 
 // Update the current position we are checking by going each direction in the stack
 // Starting from the master
-void updateCurrentPos(stackPair stack[maxNodes])
+void updateCurrentPos(StackPair stack[maxNodes])
 {
   currentPos = ""; // Reset
   for (int i = 0; i <= stackTop; i++)
@@ -646,7 +602,7 @@ int power(int base, int exponent)
   return p;
 }
 
-void sendBounds(bounds_data b, uint8_t nodeId)
+void sendBounds(BoundsData b, uint8_t nodeId)
 {
   bus.send_packet_blocking(nodeId, &b, sizeof(b));
 }
@@ -672,7 +628,7 @@ String dataToString(Data data)
   dataS += ":";
   dataS += data.id;
   dataS += ":";
-  dataS += data.value;
+  dataS += String(data.value, 5);
   return dataS;
 }
 

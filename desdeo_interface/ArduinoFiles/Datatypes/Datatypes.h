@@ -12,7 +12,7 @@ typedef struct {
     uint8_t potCount = 0;
     uint8_t rotCount = 0;
     uint8_t butCount = 0;
-} node; 
+} ComponentCounts; 
 
 typedef struct {
     char componentType;
@@ -20,21 +20,35 @@ typedef struct {
     double minValue;
     double maxValue;
     double stepSize;
-} bounds_data;
+} BoundsData;
 
+// This is the data structure that is send to the master
 typedef struct
 {
   uint8_t nodeId;
   double value;
   uint8_t id;
   char type;
-} data;
+} Data;
 
-enum Node {
+typedef struct
+{
+  uint8_t nodeId;
+  uint8_t dir = 0;
+} StackPair;
+
+enum NodeType {
     empty = 0,
     master = 1,
     singlePot = 2, singleRot = 3, singleBut = 4,
     display = 5, dualRot = 6
+};
+
+struct MyEeprom
+{
+  bool configured;
+  bool isMaster;
+  NodeType type;
 };
 
 
@@ -52,30 +66,32 @@ const char csCompleted = 'O';
 const char dirToCheck = 'D';
 const char bounds = 'B';
 
-// Or array of nodes?
-node getNode(Node n)
+// Or array of nodes? this might actually be more hassle free in the future
+// Say you want to add a new component x, now with array you would have to add that x to every type
+// -> {0,0,0} -> {0,0,0,0} and so on. 
+ComponentCounts getCounts(NodeType n)
 {
-   node node;
+   ComponentCounts counts;
    switch (n)
    {
     case master:
-        node.rotCount = 1;
-        node.butCount = 2;
+        counts.rotCount = 1;
+        counts.butCount = 2;
         break;
     case singlePot:
-        node.potCount = 1;
+        counts.potCount = 1;
         break;
     case singleRot:
-        node.rotCount = 1;
+        counts.rotCount = 1;
         break;
     case singleBut:
-        node.butCount = 1;
+        counts.butCount = 1;
     case dualRot:
-        node.rotCount = 2;
-    default: // empty
+        counts.rotCount = 2;
+    default: 
         break;
     }
-   return node;
+   return counts;
 }
 
 #endif
