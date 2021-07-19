@@ -479,24 +479,27 @@ void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Pack
     info += " ";
     toSerialWithCRC(info);
   }
-  else if (char(payload[0]) == nodeConnected && interfaceReady)
-  { // A node connected
-    Serial.println(nodeConnected);
-    interfaceReady = false;
-    runConfiguration();
-  }
-  else if (char(payload[0]) == nodeDisconnected && interfaceReady)
-  { // A node disconnected
-    uint8_t nodeId = payload[1];
-    uint8_t dir = payload[2];
-    disconnectedNodeToSerial(nodeId, dir);
-  }
-  else if (interfaceReady)
-  { // Node sending data, figure out a better way
-    Data data;
-    memcpy(&data, payload, sizeof(data));
-    String dataS = dataToString(data);
-    toSerialWithCRC(dataS);
+  if (interfaceReady)
+  {
+      if (char(payload[0]) == nodeConnected)
+      { // A node connected
+        Serial.println(nodeConnected);
+        interfaceReady = false;
+        runConfiguration();
+      }
+      else if (char(payload[0]) == nodeDisconnected)
+      { // A node disconnected
+        uint8_t nodeId = payload[1];
+        uint8_t dir = payload[2];
+        disconnectedNodeToSerial(nodeId, dir);
+      }
+      else
+      { // Node sending data, figure out a better way
+        Data data;
+        memcpy(&data, payload, sizeof(data));
+        String dataS = dataToString(data);
+        toSerialWithCRC(dataS);
+      }
   }
 };
 
