@@ -1,4 +1,15 @@
-# Packet ids
+## Packet sending
+A packet is sent with the PJON SoftwareBitBang protocol [https://www.pjon.org/SoftwareBitBang.php].
+To receive a packet a node must call the bus.receive function. 
+Packets can be blocking, meaning they are sent until received or some other condition. 
+We can check the status of each sent packet: was it received etc... 
+Each packet is accompanied with a packet id, see below.
+Whenever a packet is received we call the receiver_function, read the packet id and do actions
+depending on the packet id. 
+
+
+
+## Packet ids
 Make packets identifiable which makes communication between master - pc and master - node simpler. 
 Each packet has an identifier expect those which only contain a struct datatype, see bounds and component value. 
 There's only one unidentified packet per communication direction and therefore it is fine. adding one more would break this.
@@ -7,7 +18,7 @@ There's only one unidentified packet per communication direction and therefore i
 The nodes read the packet ids from the datatypes.h headerfile which is located in [desdeo_interface/ArduinoFiles/Datatypes](desdeo_interface/ArduinoFiles/Datatypes).
 The ids are checked in the receiver function or the main loop if data is coming from serial.
 
-# Packet ids for serial communication
+### Packet ids for serial communication
 Communication between master and pc through serial port. 
 Here S and M stand for Serial port and Master respectively.
 All lines written to serial should be of form "ID dataString CRC".
@@ -27,7 +38,7 @@ All lines written to serial should be of form "ID dataString CRC".
 
 *Any node can get the configuration command from serial not only the master!
 
-# Packet ids for PJON communication
+### Packet ids for PJON communication
 Communication between master and the slaves with the PJON software bitbang protocol.
 Here S and M stand for Slave and Master respectively and CS for configuration state
 All packets, except data packet which contains component values, should be byte arrays where
