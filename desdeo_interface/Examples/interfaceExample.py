@@ -11,6 +11,7 @@ import serial
 import time
 from tkinter import *
 import numpy as np
+from serial.serialwin32 import Serial
 ser = serial.Serial("COM3", 9600)
 
 nodes = {}
@@ -79,7 +80,7 @@ class Node:
 def run_configuration():
     global configured
     global nodes
-    b1.destroy()
+    b1.configure(text="Reconfigure", command=reconfigure)
     ser.write(b'S')
     poss = []
     ids = []
@@ -134,16 +135,21 @@ def check_serial():
                 if node is not None:
                     node.disconnect()
             elif s[0] == 'C':
-                print("DESTROY")
-                configured = False
-                for id, node in nodes.items():
-                    node.destroy()
-                nodes = {}        
-                root.after(500, run_configuration)
-                break
+                reconfigure()
 
     root.after(100, check_serial)
         
+def reconfigure():
+    global configured
+    global nodes
+    print("DESTROY")
+    ser.write(b'Q')
+    configured = False
+    for id, node in nodes.items():
+        node.destroy()
+    nodes = {}        
+    root.after(500, run_configuration)
+
 def find_with(pos):
     for id, node in nodes.items():
         if np.all(node.pos == pos):
