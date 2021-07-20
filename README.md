@@ -13,6 +13,8 @@ If a node gets disconnect after the CS a node next to it will notice this immedi
 
 Whenever a node connects it send a message to the master indicating that is has connected. If the configuration state is not done the master will ignore this message, otherwise the master receives the message and runs the configuration again since a new node has connected.
 
-Each node, including the master, has 4 digital pins reserved for each direction (TOP 7, RIGHT 15, BOTTOM 14, LEFT 16) which are used by the configuration checker. Shortly we go node by node checking each direction, for more details check [configuration checker](doc/ConfigurationChecker). In addition to these direction pins each node also needs 2 digital pins (ATmega32u4 supports pins 2,4,8,12) for communication, in 4/out 8. The master communicates through serial so pins tx/rx should be left empty.
+Each node, including the master, has 4 digital pins reserved for each direction (TOP 7, RIGHT 15, BOTTOM 14, LEFT 16) which are used to assign dynamic ids, understand the configuration and check for disconnected nodes. Shortly we go node by node checking each direction, for more details check [direction pins](doc/DirectionPins). 
 
-![Shcematic of a node](doc/Schematics/node_schematic_v0_1.png)
+In addition to direction pins each node also needs 2 digital pins (ATmega32u4 supports pins 2,4,8,12) for communication, in 4/out 8. The master communicates through serial so pins tx/rx should be left empty.
+
+![Schematic of a node](doc/Schematics/node_schematic_v0_1.png)
