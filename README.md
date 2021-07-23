@@ -1,8 +1,7 @@
 # Physical interface for desdeo framework
 
 Currently the nodes communicate with each other using the [PJON software bitbang](https://www.pjon.org/SoftwareBitBang.php) protocol. 
-Each node has it's own dynamically assigned unique id which the master is aware of. This allows the master to communicate with a specific node. The master also knows the location and connected components of each node. This is achieved by a [configuration checker](doc/ConfigurationChecker) which runs when the master reads the starting byte from the serial.
-(More info on starting byte and other packet ids)[doc/PacketIds] 
+Each node has it's own dynamically assigned unique id which the master is aware of. This allows the master to communicate with a specific node. The master also knows the location and connected components of each node. 
 
 In configuration state (CS) each node is assigned an id by the master and each node sends it basic information to master (atm: How many components of each type it has).
 After the CS. The nodes send the values of the components to the master. These values are only sent when a value of a component changes and only that component value is sent along with the node id, component id and type (i.e. [421, 2, 'P', 1] which translates back to [value, node id, component type, component id]). After the master receives such data from a node it will read it and write the values to Serial port which can the be used whenever needed. None of this data is saved to the master so the master doesn't know anything of the nodes. But the other end of Serial should.

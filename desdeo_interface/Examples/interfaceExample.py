@@ -12,7 +12,7 @@ import time
 from tkinter import *
 import numpy as np
 from serial.serialwin32 import Serial
-ser = serial.Serial("COM3", 9600)
+ser = serial.Serial("COM10", 9600)
 
 nodes = {}
 configured = False
@@ -180,8 +180,7 @@ def read_direction(s):
             print("what is this direction")
     return dir
 
-while ser.readline() is None:
-    continue
+
 
 root = Tk("Main window")
 root.geometry("600x600")
