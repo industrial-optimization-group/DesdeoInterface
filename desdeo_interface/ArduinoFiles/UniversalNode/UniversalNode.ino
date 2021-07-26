@@ -12,7 +12,7 @@
 //#define Serial WebUSBSerial
 WebUSB WebUSBSerial(1 /* http:// */, "localhost:3000");
 
-uint8_t nt;
+NodeType nt;
 bool isMaster = false; // TODO check if multiple masters?
 bool configured = false;
 
@@ -43,6 +43,9 @@ bool directionsToCheck[4];
 // For setting direction pins and configuration
 DirectionPins dp = DirectionPins(7,15,14,16); // UP, RIGHT, DOWN, LEFT
 //DirectionPins dp = DirectionPins(7, 5, 6, 9); // for nanos and unos
+
+// To only set interrupts once
+bool interruptsSet = false;
 
 // Slave specific
 bool waitingForLight = false;
@@ -171,23 +174,43 @@ void initializeComponents()
   for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
+    pot.activate();
     pots[i] = pot;
-    //components[i] = pot;
   }
 
   for (int i = 0; i < c.rotCount; i++)
   {
-    RotaryEncoder rot = RotaryEncoder(rotPins[i][0], rotPins[i][1], i);
+    int pin1 = rotPins[i][0];
+    uint8_t pin2 = rotPins[i][1];
+    RotaryEncoder rot = RotaryEncoder(pin1, pin2, i);
+    rot.activate();
     rots[i] = rot;
-    //components[potCount + i] = rot;
   }
 
   for (int i = 0; i < c.butCount; i++)
   {
     Button button = Button(bPins[i], i);
+    button.activate();
     buttons[i] = button;
-    //components[potCount + rotCount + i] = button;
   }
+}
+
+// Set interupts for rotary encoders, maybe in future for buttons and other comps
+void setInterrupts() {
+   ComponentCounts c = getCounts(nt);
+   for (int i = 0; i < c.rotCount; i++)
+   {
+    attachInterrupt(digitalPinToInterrupt(rotPins[i][0]), updateRots, CHANGE);
+   }
+   interruptsSet = true;
+}
+
+void updateRots() {
+   ComponentCounts c = getCounts(nt);
+   for (int i = 0; i < c.rotCount; i++)
+   {
+    rots[i].update();
+   }
 }
 
 void load()
@@ -213,12 +236,11 @@ void checkPots(bool blocking = false)
   for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = pots[i];
-    double value = pot.getValue();
-    pots[i] = pot;
+//    pots[i] = pot;
     if (pot.hasChanged() || blocking)
     {
       Data data;
-      data.value = value;
+      data.value = pot.getValue();
       data.id = pot.getId();
       data.type = pot.getType();
       if (isMaster)
@@ -233,20 +255,18 @@ void checkPots(bool blocking = false)
   }
 };
 
-void checkRots(bool blocking = false)
+void checkRots()
 {
   ComponentCounts c = getCounts(nt);
   for (int i = 0; i < c.rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
-    double value = rot.getValue();
-    rots[i] = rot;
-    if (rot.hasChanged() || blocking)
-    {
+    if (rot.hasChanged()){
       Data data;
-      data.value = value;
+      data.value = rot.getValue();
       data.id = rot.getId();
       data.type = rot.getType();
+      rots[i] = rot;
       if (isMaster)
       {
         data.nodeId = masterId;
@@ -254,7 +274,7 @@ void checkRots(bool blocking = false)
         toSerialWithCRC(dataS);
       }
       else
-        sendData(data, blocking);
+        sendData(data);
     }
   }
 }
@@ -353,7 +373,6 @@ void loop()
     //todo Vaidate type
     nt = type;
     save();
-    initializeComponents();
   }
 
  if (!interfaceReady)
@@ -382,11 +401,14 @@ void loop()
   if (!interfaceReady)
     return;
 
+  if (!interruptsSet)
+    setInterrupts();
+    
   // Check for changing values in components
   bus.receive(1500);
-  checkPots(); //ADC
+  checkPots(); //TODO ADC
   bus.receive(1500);
-  checkRots(); //todo Interupts
+  checkRots(); // TODO update rot and getValue rot also... dynamic steps
   checkButtons();
   
   // Check for disconnected nodes

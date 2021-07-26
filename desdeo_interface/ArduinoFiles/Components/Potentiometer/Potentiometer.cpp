@@ -5,8 +5,6 @@
 Potentiometer::Potentiometer(int analogPin, uint8_t id): Component(id, 'P')
 {
     _pin = analogPin;
-    pinMode(_pin, INPUT);
-    _prevValue = analogRead(_pin);
 };
 
 // Get the analog pin value the potentiometer is connected to
@@ -38,4 +36,10 @@ void Potentiometer::setBounds(double min, double max)
     if (max <= min) return;
     _min = min;
     _max = max;
+}
+
+void Potentiometer::activate()
+{
+    pinMode(_pin, INPUT);
+    _prevValue = analogRead(_pin);
 }

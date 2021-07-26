@@ -15,7 +15,8 @@ public:
     Potentiometer(int analogPin, uint8_t id);
     double getValue();
     void setBounds(double max, double min);
-
+    void activate();
+    
 private:
     uint16_t filter(uint16_t value);
     double scale(double value, double min, double max);

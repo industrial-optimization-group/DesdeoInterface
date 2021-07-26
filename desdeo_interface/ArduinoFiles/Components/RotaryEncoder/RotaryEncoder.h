@@ -16,6 +16,9 @@ class RotaryEncoder: public Component
         void getValues(uint8_t *arr);
         void setBounds(double max, double min, double stepSize);
         double getValue();
+        void activate();
+        void update();
+
     private:
         int _pin0;
         int _pin1;

@@ -16,6 +16,7 @@ public:
     uint8_t getId();
     char getType();
     virtual double getValue() = 0;
+    virtual void activate() = 0;
 
 protected:
     bool _hasChanged;

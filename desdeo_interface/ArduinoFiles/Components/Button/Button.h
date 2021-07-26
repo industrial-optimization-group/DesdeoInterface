@@ -14,6 +14,7 @@ public:
     Button() {}
     Button( int pin, uint8_t id);
     double getValue();
+    void activate();
 
 private:
     int _pin;
