@@ -61,11 +61,13 @@ bool directionsToCheck[4]; // Directions to be checked after configuration state
 const uint8_t dirs[4] = {7, 15, 14, 16};                              // Digital pins: UP, RIGHT, DOWN, LEFT
 DirectionPins dp = DirectionPins(dirs[0], dirs[1], dirs[2], dirs[3]); // Instansiate direction pins object
 
+
 // Node specific
 
 // used in configuration state
 bool waitingForLight = false; // Is the node waiting for signal
 bool latestReceiver = false;  // Is the node the latest receiver
+
 
 // Master specific:
 
@@ -75,20 +77,28 @@ const uint8_t maxNodes = 50; // What is the max count of nodes in the configurat
 // used in configuration state
 uint8_t nextId = 1;   // upto 253, Do not start from 0 as that is reserved for PJON broadcast
 uint8_t stackTop = 0; // Initally master is at top, we use id 0 here for master for simplicity.
-// TODO currentPos should be byte array
+// TODO currentPos should be an array
 String currentPos = ""; // The position the configuration state is checking at that moment. Updated every loop
 
 // For cyclic redundancy check
 const uint8_t crcKey = 7; // This key has to be same on both sides
 CRC8 crc = CRC8(crcKey);
 
+
 // Slave functions:
 
-// This function is called whenever a packet is received
-// Each packet expect a bounds packet has an id, located at payload[0] which is used to determine the action.
+/*
+ * Function: receiver_function_slave 
+ * --------------------
+ * Is called whenever a slave receives a packet.
+ * 
+ * payload: packet
+ * length: packet length
+ * packet_info: A pjon packet info that contains information on packet. Not used
+ */
 void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
-  char command = char(payload[0]);
+  char command = char(payload[0]); // packet id
 
   if (command == start)
   { // Start configuration state
@@ -124,6 +134,12 @@ void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packe
   }
 }
 
+
+/*
+ * Function: handleStartPacket 
+ * --------------------
+ * Handles a start packet by setting direction pins to input and sets a flag
+ */
 void handleStartPacket()
 {
   led.setColor(inConfigurationStateColor);
@@ -131,6 +147,14 @@ void handleStartPacket()
   waitingForLight = true;    // Node should expect a signal.
 }
 
+/*
+ * Function: handleIdPacket 
+ * --------------------
+ * Handles an id packet by setting the given id to self and setting flags 
+ * and directions pins 
+ * 
+ * newId: The new id for the node
+ */
 void handleIdPacket(uint8_t newId)
 {
   latestReceiver = false;
@@ -140,12 +164,24 @@ void handleIdPacket(uint8_t newId)
   dp.setPinsInput(); // Set back to input mode. In case disconnecting happens
 }
 
+/*
+ * Function: handleDirInstructionPacket
+ * --------------------
+ * Handles direction instruction packet by setting the given direction pin to low
+ * 
+ * dir: given direction
+ */
 void handleDirInstructionPacket(uint8_t dir)
 {
   dp.setPinsInput(); // All pins to input first
   dp.setPinLow(dir); // Set given direction to low
 }
 
+/*
+ * Function: handleCSCompletedPacket
+ * --------------------
+ * Handles configuration completed packet by setting directions pins to correct state
+ */
 void handleCSCompletedPacket()
 {
   led.setColor(configuredColor); // green
@@ -153,14 +189,29 @@ void handleCSCompletedPacket()
   interfaceReady = true;
 }
 
+/*
+ * Function: handleBoundsPacket
+ * --------------------
+ * Handles a bounds packet by setting corresponding components bounds to given bounds
+ * 
+ * payload: the packet that has been sent.
+ */
 void handleBoundsPacket(uint8_t *payload)
 {
-  BoundsData b;
-  memcpy(&b, payload, sizeof(b));
+  BoundsData b; // Init bounds
+  memcpy(&b, payload, sizeof(b)); // Load bounds
   setBounds(b);
 }
 
-// Send the Data struct to master
+/*
+ * Function: sendData
+ * --------------------
+ * Send a Data type to master
+ * 
+ * data: The data to be send.
+ * 
+ * Returns: was the packet send successfully
+ */
 bool sendData(Data data)
 {
   data.nodeId = id;
@@ -168,7 +219,11 @@ bool sendData(Data data)
   return (packet != PJON_ACK);
 }
 
-// should propably reset component bounds as well
+/*
+ * Function: setSelfToInitialMode
+ * --------------------
+ * Sets the nodes global variables back to inital state
+ */
 void setSelfToInitialMode()
 {
   led.setColor(initialStateColor); // Orange
@@ -184,15 +239,26 @@ void setSelfToInitialMode()
   bus.set_id(id);
 }
 
-// Send initial info
+/*
+ * Function: sendComponentInfo
+ * --------------------
+ * Sends the node type to master in the configuration state as an confirmation packet
+ */
 void sendComponentInfo()
 {
   uint8_t content[2] = {nodeInfo, nt};
   bus.send_packet_blocking(masterId, content, 2);
 }
 
-// Shared functions
+// Shared functions: used by both master and nodes
 
+/*
+ * Function: setDirectionPins
+ * --------------------
+ * Sets the direction pins low where no nodes were found
+ * Other directions will be input.
+ * Used to check for disconnecting nodes.
+ */
 void setDirectionPins()
 {
   dp.setPinsInput();
@@ -205,6 +271,15 @@ void setDirectionPins()
   }
 }
 
+/*
+ * Function: setBounds
+ * --------------------
+ * Sets the direction pins low where no nodes were found
+ * Other directions will be input.
+ * Used to check for disconnecting nodes.
+ * 
+ * b: The bounds
+ */
 void setBounds(BoundsData b)
 {
   if (b.componentType == 'R')
@@ -217,6 +292,12 @@ void setBounds(BoundsData b)
   }
 }
 
+/*
+ * Function: setADS
+ * --------------------
+ * Initializes the ADS module
+ * Only called if the node has an potentiometer.
+ */
 void setADS()
 {
   ADS.begin();
@@ -224,7 +305,11 @@ void setADS()
   ADS.setDataRate(7); // Fastest
 }
 
-// Initialize each component
+/*
+ * Function: initializeComponents
+ * --------------------
+ * Initializes all components.
+ */
 void initializeComponents()
 {
   ComponentCounts c = getCounts(nt);
@@ -262,6 +347,11 @@ void initializeComponents()
   }
 }
 
+/*
+ * Function: load
+ * --------------------
+ * loads the nodetype from EEPROM.
+ */
 void load()
 {
   EEPROM.get(0, nt);
@@ -272,6 +362,11 @@ void load()
     Serial.println("configuration loaded");
 }
 
+/*
+ * Function: save
+ * --------------------
+ * saves the nodetype to EEPROM.
+ */
 void save()
 {
   EEPROM.put(0, nt);
@@ -279,7 +374,13 @@ void save()
     Serial.println("Configuration saved");
 }
 
-// Check if potentiometers have changed
+/*
+ * Function: checkPots
+ * --------------------
+ * Checks every potentiometer that is connected.
+ * If changes in values then they are sent to master or to serial
+ * depending on whether the current node is master or not
+ */
 void checkPots()
 {
   ComponentCounts c = getCounts(nt);
@@ -303,11 +404,18 @@ void checkPots()
       else
         sendData(data);
     }
-    led.setColor(configuredColor); // green
+    led.setColor(configuredColor);
     pots[i] = pot;
   }
 };
 
+/*
+ * Function: checkRots
+ * --------------------
+ * Checks every rotary encoder that is connected.
+ * If changes in values then they are sent to master or to serial
+ * depending on whether the current node is master or not
+ */
 void checkRots()
 {
   ComponentCounts c = getCounts(nt);
@@ -337,6 +445,13 @@ void checkRots()
   }
 }
 
+/*
+ * Function: checkButtons
+ * --------------------
+ * Checks every button that is connected including rotary encoder switches.
+ * If changes in values then they are sent to master or to serial
+ * depending on whether the current node is master or not
+ */
 void checkButtons()
 {
   ComponentCounts c = getCounts(nt);
@@ -365,9 +480,15 @@ void checkButtons()
   }
 }
 
-// Check for directions which have a node
-// Return a disconnected node id if one found
-// else -1 indicating everything is fine
+/*
+ * Function: checkNodes
+ * --------------------
+ * Checks if a node has disconnected by reading direction pin values.
+ * Only called when configuration is completed
+ * 
+ * Returns: The direction of a disconnected node
+ *  or -1 if no disconnected nodes.
+ */
 int8_t checkNodes()
 {
   for (int i = 0; i < 4; ++i)
@@ -381,8 +502,15 @@ int8_t checkNodes()
   return -1;
 }
 
-// Return the first byte in serial and remove it from there
-// if nothing is available return 0
+/*
+ * Function: checkSerial
+ * --------------------
+ * Reads a byte from serial if available. Is also responsible of checking
+ * which serial is in use: The node will use that serial which first was available
+ * until a Quit packet is received.  
+ * 
+ * Returns: The first character from serial.
+ */
 char checkSerial()
 {
   if (whichSerial == 0)
@@ -406,6 +534,12 @@ char checkSerial()
   return 0; // NUL
 }
 
+/*
+ * Function: setup
+ * --------------------
+ * Initializes components, serial and loads the nodetype from EEPROM.
+ * Is called for both master and nodes
+ */
 void setup()
 {
   led.setColor(initialStateColor);
@@ -414,9 +548,14 @@ void setup()
   load();
   initializeComponents();
   if (!isMaster)
-    setup_slave();
+    setup_node();
 }
 
+/*
+ * Function: setup_master
+ * --------------------
+ * Setups master. Mainly resposible of setting the id and pjon bus.
+ */
 void setup_master()
 {
   id = masterId;
@@ -429,7 +568,12 @@ void setup_master()
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 }
 
-void setup_slave()
+/*
+ * Function: setup_slave
+ * --------------------
+ * Setups a node. Mainly resposible of setting the id and pjon bus.
+ */
+void setup_node()
 {
   bus.strategy.set_pins(inputPin, outputPin);
   bus.set_receiver(receiver_function_slave);
@@ -440,9 +584,15 @@ void setup_slave()
   bus.send_packet_blocking(masterId, packet, 1);
 }
 
+/*
+ * Function: loop
+ * --------------------
+ * The main loop of the program. Is called forever and for both master and nodes.
+ * Everything is handled here as interrupts caused some issues and pjon doesn't support interrupts.
+ */
 void loop()
 {
-  char serial = checkSerial();
+  char serial = checkSerial(); 
 
   if (serial == configure)
   {
@@ -476,7 +626,7 @@ void loop()
   }
   else
   {
-    slaveLoop();
+    nodeLoop();
   }
   if (!interfaceReady)
     return;
@@ -494,6 +644,13 @@ void loop()
   bus.receive(150);
 };
 
+/*
+ * Function: handleDisconnectedNodes
+ * --------------------
+ * Sends information of the disconnected to master or Serial depending on wether or not 
+ * the node is master or not. The packet contains this nodes id and the direction of the disconnected node.
+ * These values together can be used to determine the id of the disconnected node.
+ */
 void handleDisconnectedNodes()
 {
   // Check for disconnected nodes
@@ -513,6 +670,14 @@ void handleDisconnectedNodes()
   }
 }
 
+/*
+ * Function: masterLoop
+ * --------------------
+ * Main loop for only the master.
+ * Currently used for initial configuration and serial commands
+ * 
+ * serial: the char read from serial in main loop.
+ */
 void masterLoop(char serial)
 {
   if (!interfaceReady)
@@ -529,6 +694,11 @@ void masterLoop(char serial)
   }
 }
 
+/*
+ * Function: handleQuitSerial
+ * --------------------
+ * Handles a quit packet from serial by setting self to inital mode and sending a reset packet to all nodes.
+ */
 void handleQuitSerial()
 {
   led.setColor(initialStateColor);
@@ -540,6 +710,11 @@ void handleQuitSerial()
   whichSerial = 0;
 }
 
+/*
+ * Function: handleBoundsSerial
+ * --------------------
+ * Handles a bounds packet from serial by parsing it and then sending the bounds to the corresponding node.
+ */
 void handleBoundsSerial()
 {
   BoundsData b;
@@ -568,11 +743,22 @@ void handleBoundsSerial()
     sendBounds(b, nodeId);
 }
 
-void slaveLoop()
+/*
+ * Function: nodeLoop
+ * --------------------
+ * A nodes main loop. 
+ */
+void nodeLoop()
 {
   checkForSignal();
 }
 
+/*
+ * Function: checkForSignal
+ * --------------------
+ * Checks for pins being pulled down in the configuration state. Not called by master.
+ * If a pin is pulled down and is waiting for it then sends information to master
+ */
 void checkForSignal()
 {
   if (interfaceReady)
@@ -589,8 +775,14 @@ void checkForSignal()
   }
 }
 
+
 // Master functions:
 
+/*
+ * Function: receiver_function_master
+ * --------------------
+ * Called whenever a the master receives a packet from a node.
+ */
 void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
   if (char(payload[0]) == nodeInfo)
@@ -615,6 +807,11 @@ void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Pack
   }
 };
 
+/*
+ * Function: handleNodeConnection
+ * --------------------
+ * Handles a new node connection packet from a node after configuration state by passing the information to serial
+ */
 void handleNodeConnection()
 {
   Serial.println(nodeConnected);
@@ -622,11 +819,23 @@ void handleNodeConnection()
   webusbSerial.flush();
 }
 
+/*
+ * Function: handleNodeDisconnection
+ * --------------------
+ * Handles a node disconnection packet from a node after configuration state by passing the information to serial
+ */
 void handleNodeDisconnection(uint8_t nid, uint8_t dir)
 {
   disconnectedNodeToSerial(nid, dir);
 }
 
+/*
+ * Function: handleDataPacket
+ * --------------------
+ * Handles a data packet from a node by reading it and passing it to serial with crc checksum
+ * 
+ * payload: the packet
+ */
 void handleDataPacket(uint8_t *payload)
 {
   Data data;
@@ -635,7 +844,17 @@ void handleDataPacket(uint8_t *payload)
   toSerialWithCRC(dataS);
 }
 
-// TODO get rid of string its slow
+/*
+ * Function: sendNodeInfo
+ * --------------------
+ * Converts node info to a string and writes it to serial w crc checksum
+ * 
+ * id: node id
+ * nt: node type
+ * pos: node position
+ * 
+ * TODO: String are bad
+ */
 void sendNodeInfo(uint8_t id, uint8_t nt, String pos)
 {
   String info = String(nodeInfo);
@@ -649,7 +868,11 @@ void sendNodeInfo(uint8_t id, uint8_t nt, String pos)
   toSerialWithCRC(info);
 }
 
-// Configuration checking
+/*
+ * Function: runConfiguration
+ * --------------------
+ * Sets variables and handles start and finish packets for the configuration state
+ */
 void runConfiguration()
 {
   // send own info
@@ -666,7 +889,7 @@ void runConfiguration()
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 
   StackPair stack[maxNodes]; // Use this array like a stack.
-  configuration(stack);
+  configuration(stack); // Main configuration loop
 
   interfaceReady = true;
   dp.setPinsInput();
@@ -685,10 +908,15 @@ void runConfiguration()
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 }
 
-// Initial configuration: Assign ids dynamically to nodes,
-// and find their positions
-// stack: Initally this is a array where all pairs are equal to (0,0)
-// The stack will be updated as the configuration continues
+/*
+ * Function: configuration
+ * --------------------
+ * Runs the initial configuration until all directions are checked. 
+ * This will assign dynamic ids to each node in the configuration and get their position.
+ * More information in the docs.
+ * 
+ * stack: An array of stackpairs used to determine the positions of the nodes.
+ */
 void configuration(StackPair stack[maxNodes])
 {
   uint8_t dir = stack[stackTop].dir;
@@ -742,8 +970,15 @@ void configuration(StackPair stack[maxNodes])
   configuration(stack);
 }
 
-// Update the current position we are checking by going each direction in the stack
-// Starting from the master
+/*
+ * Function: updateCurrentPos
+ * --------------------
+ * Updates the current position by reading the stack of stackpairs
+ * 
+ * stack: The stack of stackpairs which containts node id and the current direction checked
+ * 
+ * TODO currentPos is string... 
+ */
 void updateCurrentPos(StackPair stack[maxNodes])
 {
   currentPos = ""; // Reset
@@ -753,11 +988,26 @@ void updateCurrentPos(StackPair stack[maxNodes])
   }
 }
 
+/*
+ * Function: sendBounds
+ * --------------------
+ * Sends a bounds packet to a node
+ * 
+ * nodeId: To which node the packet should be send
+ */
 void sendBounds(BoundsData b, uint8_t nodeId)
 {
   bus.send_packet_blocking(nodeId, &b, sizeof(b));
 }
 
+/*
+ * Function: disconnectedNodeToSerial
+ * --------------------
+ * Converts disconnectedNode data to a string and writes it to serial with crc
+ * 
+ * found_id: the id of the node that noticed the disconnection
+ * dir: the direction of the disconnection
+ */
 void disconnectedNodeToSerial(uint8_t found_id, uint8_t dir)
 {
   String s = String(nodeDisconnected);
@@ -768,7 +1018,15 @@ void disconnectedNodeToSerial(uint8_t found_id, uint8_t dir)
   toSerialWithCRC(s);
 }
 
-// Convert Data type to string
+/*
+ * Function: dataToString
+ * --------------------
+ * Converts Data type to a string that can be written to serial
+ * 
+ * data: data to be converted
+ * 
+ * TODO String are still badc
+ */
 String dataToString(Data data)
 {
   String dataS = String(componentValue);
@@ -783,6 +1041,15 @@ String dataToString(Data data)
   return dataS;
 }
 
+/*
+ * Function: toSerialWithCRC
+ * --------------------
+ * Calculated the CRC checksum of a given string and writes the string and the checksum to serial
+ * 
+ * s: The string
+ * 
+ * TODO Strings
+ */
 void toSerialWithCRC(String s)
 {
   uint8_t data[s.length() + 1];
