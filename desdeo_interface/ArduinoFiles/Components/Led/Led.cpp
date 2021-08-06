@@ -1,50 +1,69 @@
+/*
+    Led.cpp - Library for displaying status codes with the help of a rgb led
+*/
+
 #include "Arduino.h"
 #include "Led.h"
 
 Led::Led(uint8_t redPin, uint8_t greenPin, uint8_t bluePin)
 {
-    _pins = {redPin, greenPin, bluePin};
-    _rgb = toRgb(white)
+    _pins[0] = redPin;
+    _pins[1] = greenPin;
+    _pins[2] = bluePin;
+    _isOn = true;
     for (uint8_t pin: _pins)
         pinMode(pin, OUTPUT);
-    _isOn = false;
+    off();
 }
 
-void Led::setColor(Color color)
+/*
+ * Function: setColor
+ * --------------------
+ * Sets the led color
+ *
+ * rgb[3]: An array of red, green and blue values to set the pins
+ */
+void Led::setColor(uint8_t rgb[3])
 {
-    uint8_t rgb[3] = toRgb(color);
-    _setPins(rgb);
+    for (int i = 0; i < 3; ++i)
+    {
+        _rgb[i] = rgb[i];
+        digitalWrite(_pins[i], _rgb[i]);
+    }
 }
 
-void Led::setColor(uint8_t red, uint8_t green, uint8_t blue)
-{
-    uint8_t rgb[3] = {red, green, blue};
-    _setPins(rgb);
-}
-
+/*
+ * Function: off
+ * --------------------
+ * Turns the led off
+ */
 void Led::off()
 {
     _isOn = false;
-    _setPins({0,0,0});
+    uint8_t rgb[3] = {0,0,0};
+    setColor(rgb);
 }
 
+/*
+ * Function: on
+ * --------------------
+ * Turns the led on
+ */
 void Led::on()
 {
     _isOn = true;
-    _setPins(_rgb);
+    setColor(_rgb);
 }
 
+/*
+ * Function: toggle
+ * --------------------
+ * Toggles the led. If on then turns off and likewise
+ */
 void Led::toggle()
 {
     if (_isOn)
-        off()
+        off();
     else
-        on()
-}
-
-void Led::_setPins(uint8_t[3] rgb)
-{
-    _rgb = rgb;
-    for (int i = 0; i < 3; ++i) 
-        digitalWrite(_pins[i], _rgb[i]);
+        on();
 }

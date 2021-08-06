@@ -1,11 +1,72 @@
 let connectButton = document.getElementById("connect");
 let startButton = document.getElementById("start");
+let nodeContainer = document.getElementById("nodes");
+
+const roles = [
+    "obj1",
+    "obj2",
+    "ojb3",
+]
+
+const colors = {
+    0: 'green',
+    1: 'blue',
+    2: 'yellow',
+    3: 'orange',
+    4: 'cyan',
+}
 
 class Node {
     constructor(id, type, pos) {
         this.id = id;
         this.type = type;
         this.pos = pos;
+        this.color = colors[type];
+        this.element = this.createElement()
+    }
+
+    
+    createElement() {
+        const center = {x: 500, y:500};
+        const w = 100;
+
+        var div = document.createElement('div');
+
+        div.setAttribute('id', this.id);
+        div.style.position = "absolute";
+        div.style.justifyContent = "center";
+        div.style.left =  (center.x + (this.pos.x * w))+ "px"
+        div.style.top = (center.y + (this.pos.y * w)) + "px"
+        div.style.width = w + "px";
+        div.style.height = w + "px";
+        div.style.backgroundColor = this.color;
+        div.style.fontSize = '20px';
+        div.innerHTML = this.id === 253 ? "Master" : this.id;
+
+        const dropdown = document.createElement("select")
+        dropdown.id = 'roles';
+        dropdown.onchange = this.setRole.bind(this);
+        roles.forEach(role => {
+            const e = document.createElement("option");
+            e.value = role;
+            e.innerHTML = role;
+            dropdown.append(e);
+        })
+        div.append(dropdown);
+        
+        return div;
+    }
+
+    setRole(role) {
+        console.log("TODO: set a role");
+    }
+
+    addElement() {
+        nodeContainer.append(this.element);
+    }
+
+    removeElement() {
+        this.element.remove()
     }
 }
 
@@ -37,7 +98,8 @@ class PhysicalInterface {
                 index: 0x02,
             });
             console.log("Successfully connected");
-            setInterval(this.loop.bind(this), 500);
+            
+            this.looper = setInterval(this.loop.bind(this), 175);
         } catch (e) {
             console.log("Failed to Connect: ", e);
         }
@@ -55,13 +117,14 @@ class PhysicalInterface {
         });
         await this.device.close();
         console.log("Device Closed!")
+        Object.values(this.nodes).forEach(node => node.removeElement());
         this.device = undefined;
     }
 
     async loop() {
+        if (!this.isConnected()) clearInterval(this.looper);
         try {
             const ser = await this.read();
-            console.log(ser);
 
             if (ser.length > 0){
                 // TODO verify crc
@@ -72,7 +135,7 @@ class PhysicalInterface {
                         this.addNode(val['s']);
                         break;
                     case 'O':
-                        this.handleConfiguration();
+                        console.log("O")
                         break;
                     case 'V':
                         console.log(val['s']);
@@ -103,8 +166,9 @@ class PhysicalInterface {
 
     async read() {
         if (!this.isConnected()) return;
-        const result = await this.device.transferIn(5, 64);
+        const result = await this.device.transferIn(5, 64);        
         const command = this.decoder.decode(result.data);
+        console.log(command);
         const val = command.trim();
         return val;
     }
@@ -136,21 +200,24 @@ class PhysicalInterface {
     }
 
     addNode(s) {
-        console.log(s)
-        let info = s.split(':').map(x => {return Number(x)});
-        const pos = this.calculatePositions(info[2]);
-        let node = new Node(info[0], info[1], pos)
-        this.nodes[info[0]] = node;
+        let info = s.split(':');
+        const pos = this.calculatePosition(info[2]);
+        let node = new Node(Number(info[0]), Number(info[1]), pos)
+        this.nodes[Number(info[0])] = node;
+        node.addElement();
     }
 
-    calculatePositions(s) {
-        console.log("Calculate positions");
-        return s;
-    }
-
-    handleConfiguration() {
-        console.log("handle configuration");
-        return;
+    calculatePosition(s) {
+        let p = {x:0, y:0};
+        for (var i = 0; i < s.length; i++){
+            if (i == '0') p.y++;
+            else if (i == '1') p.x++;
+            else if (i == '2') p.y--;
+            else if (i == '3') p.x--;
+            else if (i == '-') return p;
+            else console.log("Unknown direction")
+        }
+        return p;
     }
 }
 
@@ -163,6 +230,7 @@ const connect = () => {
         connectButton.innerHTML = "Connect";
     } else {
         intf.connect();
+        intf.quit();
         connectButton.innerHTML = "Disconnect";
     }
 }

@@ -1,5 +1,5 @@
 /*
-Potentiometer.h - Library for getting input from a potentiometer
+    Potentiometer.h - Library for a potentiometer component
 */
 
 #ifndef Potentiometer_h
@@ -7,13 +7,14 @@ Potentiometer.h - Library for getting input from a potentiometer
 
 #include "Component.h"
 #include "Arduino.h"
-
+#include <ADS1X15.h>
 class Potentiometer: public Component
 {
 public:
     Potentiometer() {}
-    Potentiometer(int analogPin, uint8_t id);
-    double getValue();
+    Potentiometer(uint8_t analogPin, uint8_t id);
+    double getValue(ADS1115 adc); // Interupt kind of thing could be added
+    double getValue() {return 0;} // Could be removed
     void setBounds(double max, double min);
     void activate();
     
@@ -23,6 +24,7 @@ private:
     int _pin;
     double _min = 0;
     double _max = 0;
+    long _lastRead = 0;
 };
 
 #endif

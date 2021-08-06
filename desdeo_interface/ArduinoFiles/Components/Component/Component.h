@@ -1,5 +1,5 @@
 /*
-Component.h - Library for a base component
+    Component.h - Library for a base component
 */
 
 #ifndef Component_h

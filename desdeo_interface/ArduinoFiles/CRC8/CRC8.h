@@ -1,5 +1,5 @@
 /*
-CRC.h - Library for 8bit cyclic redundancy checking
+    CRC.h - Library for 8bit cyclic redundancy checking
 */
 
 #ifndef CRC8_h

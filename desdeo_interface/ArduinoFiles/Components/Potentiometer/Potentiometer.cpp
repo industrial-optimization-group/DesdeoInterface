@@ -1,36 +1,87 @@
+/*
+    Potentiometer.h - Library for a potentiometer component
+*/
+
 #include "Arduino.h"
 #include "Potentiometer.h"
 #include "Component.h"
-
-Potentiometer::Potentiometer(int analogPin, uint8_t id): Component(id, 'P')
+#include <ADS1X15.h>
+Potentiometer::Potentiometer(uint8_t pin,  uint8_t id): Component(id, 'P')
 {
-    _pin = analogPin;
+    _pin = pin;
 };
 
-// Get the analog pin value the potentiometer is connected to
-double Potentiometer::getValue()
+/*
+ * Function:  getValue 
+ * --------------------
+ * Get the value of the potentiometer.
+ *  Is only checked every 150ms seconds as reading from the adc is a bit slow
+ *  and we don't want the main loop to be stuck in getting the value as receiving data
+ *  is also crucial.
+ * 
+ * adc: A ADS1115 instance of the ADS module the potentiometer is connected.
+ *
+ * returns: The current value of the potentiometer
+ */
+double Potentiometer::getValue(ADS1115 adc)
 {
-    uint16_t analogVal = analogRead(_pin);
-    analogVal = filter(analogVal);;
-    _hasChanged = (_prevValue != analogVal);
-    _prevValue = analogVal;
+    uint16_t analogVal = _prevValue;
+    long m = millis();
+    if (m - _lastRead >= 150 && adc.isReady()) // Read only every 100ms
+    {
+    _lastRead = m;
+    analogVal = adc.readADC(_pin);
+    }
+
+    //analogVal = filter(analogVal);
+    _hasChanged = (abs(_prevValue-analogVal) > 100);
+    if (_hasChanged)
+        _prevValue = analogVal;
     return scale(analogVal, _min, _max);
 };
 
-// Filter the analog value
+/*
+ * Function: filter 
+ * --------------------
+ * Filters the value of the potentiometer using EMA (exponential moving average) algorithm
+ * 
+ * value: The current value
+ *
+ * returns: The filtered value
+ */
 uint16_t Potentiometer::filter(uint16_t value)
 {
-    float a = 0.12;
+    float a = 0.8;
     return ((a * value) + ((1-a)*_prevValue));
 };
 
+/*
+ * Function: scale 
+ * --------------------
+ * Scales the value to given bounds
+ * 
+ * value: The value to be scaled
+ * min: Minimum value 
+ * max: Maximum value
+ *
+ * returns: The scaled value
+ * 
+ * Note: Assumes using 16 bit ADS -> max base value 2^15
+ */
 double Potentiometer::scale(double value, double min, double max) 
 {
     if (max <= min) return value;
-    return min + (value / 1023)*(max-min);
+    return min + (value / 32768)*(max-min);
 }
 
-
+/*
+ * Function: setBounds 
+ * --------------------
+ * Set bounds for the potentiometer
+ * 
+ * min: Minimum value 
+ * max: Maximum value
+ */
 void Potentiometer::setBounds(double min, double max)
 {
     if (max <= min) return;
@@ -40,6 +91,7 @@ void Potentiometer::setBounds(double min, double max)
 
 void Potentiometer::activate()
 {
-    pinMode(_pin, INPUT);
-    _prevValue = analogRead(_pin);
+    return;
+    //pinMode(_pin, INPUT);
+    //_prevValue = _ads.readADC(_pin);
 }

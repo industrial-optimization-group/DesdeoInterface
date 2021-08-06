@@ -29,7 +29,7 @@ the first index is the id of the packet.
 | C             | Node connected      | S -> M     | NONE           |
 | NONE          | Component value     | S -> M     | struct*        |
 | S             | Start configuration | M -> S     | NONE           |
-| R             | Reset self          | M -> S     | NONE           |
+| E             | Reset self          | M -> S     | NONE           |
 | I             | Dynamic id from M   | M -> S     | [id]           |
 | N             | Instructions for CS | M -> S     | [dir]          |
 | O             | Configuration done  | M -> S     | NONE           |
@@ -50,7 +50,7 @@ All lines written to serial should be of form "ID dataString CRC".
 | S             | Start configuration | S -> M     | NONE               |
 | O             | Configuration done  | S -> M     | NONE               |
 | Q             | Quit                | S -> M     | NONE               |
-| R             | Reset               | M -> S     | NONE               |
+| E             | Reset               | M -> S     | NONE               |
 | N             | Node info           | M -> S     | id:p:r:b           |
 | C             | Node connected      | M -> S     | NONE               |
 | D             | Node disconnected   | M -> S     | id:dir             |

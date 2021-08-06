@@ -1,5 +1,5 @@
 /*
-DirectionPins.h - Library for determining the layout of the setup
+    DirectionPins.h - Library for handling direction pins
 */
 
 #ifndef DirectionPins_h

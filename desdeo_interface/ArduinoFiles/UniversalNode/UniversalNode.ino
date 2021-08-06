@@ -1,3 +1,5 @@
+#include <Led.h>
+#include <ADS1X15.h>
 #include <DirectionPins.h>
 #include <Datatypes.h>
 #include <EEPROM.h>
@@ -8,58 +10,73 @@
 #include <CRC8.h>
 #include <PJONSoftwareBitBang.h>
 #include <WebUSB.h>
-#define SERIAL_SIZE 30 //For receiving more complex data from serial
-//#define Serial WebUSBSerial
-WebUSB WebUSBSerial(1 /* http:// */, "localhost:3000");
 
-NodeType nt;
-bool isMaster = false; // TODO check if multiple masters?
-bool configured = false;
+#define ADS_ADDRESS 0x48
+#define SERIAL_SIZE 30 //Buffer for receiving data from serial. Shouldn't exceed this limit
+#define webusbSerial WebUSBSerial
 
-// max 2 of each, currently not even that
-const uint8_t maxPots = 1;
-const uint8_t maxRots = 1;
-const uint8_t maxButtons = 2;
+//Could be simplified: use less memory
+// Which serial is being used
+int8_t whichSerial = 0; // 0 undefined, -1 reg serial, 1 webusb
 
-const uint8_t potPins[maxPots] = {A0}; // The pins the potentiometers are connected
-const uint8_t rotPins[maxRots][2] = {{2, 3}}; // Change these to match easyeda
-const uint8_t bPins[maxButtons] = {19, 20}; // Buttons
+// Instansiate webusb
+WebUSB WebUSBSerial(1 /* http:// */, "127.0.0.1:5500/desdeo_interface/web/index.html");
 
+// Instansiate ads
+ADS1115 ADS(ADS_ADDRESS); //Only call begin method if pot is connected
+
+NodeType nt;           // This nodes nodetype. One can set a nodetype from serial with command 'F {nodetype}'
+bool hasType = false;  // Does the node have a valid (not empty) nodetype
+bool isMaster = false; // Is the node the master. The node which receives the start command from Serial will be declared as the Master
+
+// All of these are currently limited by the schematic/pin count. The code supports having multiple of each
+const uint8_t maxPots = 1;    // The maximum count of potentiometers a node can have.
+const uint8_t maxRots = 1;    // The maximum count of rotary encoders a node can have.
+const uint8_t maxButtons = 1; // The maximum count of buttons a node can have. Note that a rotary encoder acts as a button and is not counted here.
+
+const uint8_t potPins[maxPots] = {0};           // The ADS pins the potentiometers are connected to
+const uint8_t rotPins[maxRots][2] = {{A2, A3}}; // Rotary encoder pins
+const uint8_t rotBPins[maxRots] = {A0};         // Rotary encoder button pin
+const uint8_t bPins[maxButtons] = {A1};         // Button pins
+
+// Instanstiating empty components. These will be overwritten in setup
 Potentiometer pots[maxPots];
 RotaryEncoder rots[maxRots];
-Button buttons[maxButtons];
+Button buttons[maxButtons + maxRots];
 
-// Communication
+// Instansiate the rgb led component.
+Led led = Led(9, 6, 5);
+
+// Declare variables used in PJON
 uint8_t id = PJON_NOT_ASSIGNED; // Temporary id, until gets assigned a unique id by the master
-PJONSoftwareBitBang bus(id);
-const uint8_t outputPin = 8; // master will have these pins reversed
-const uint8_t inputPin = 4;
-const uint8_t masterId = 254;
-bool interfaceReady = false;
+PJONSoftwareBitBang bus(id);    // Instansiate the PJON bus
+const uint8_t outputPin = 8;    // For master this is 4
+const uint8_t inputPin = 4;     // For master this is 8
+const uint8_t masterId = 254;   // Master id. which always know by every node and doesn't ever change
 
-// Directions of known nodes, these will be checked every iterations of loop
-bool directionsToCheck[4];
+bool interfaceReady = false; // Is the initial configuration done
 
-// For setting direction pins and configuration
-DirectionPins dp = DirectionPins(7,15,14,16); // UP, RIGHT, DOWN, LEFT
-//DirectionPins dp = DirectionPins(7, 5, 6, 9); // for nanos and unos
+bool directionsToCheck[4]; // Directions to be checked after configuration state. Used for disconnecting nodes.
 
-// To only set interrupts once
-bool interruptsSet = false;
+const uint8_t dirs[4] = {7, 15, 14, 16};                              // Digital pins: UP, RIGHT, DOWN, LEFT
+DirectionPins dp = DirectionPins(dirs[0], dirs[1], dirs[2], dirs[3]); // Instansiate direction pins object
 
-// Slave specific
-bool waitingForLight = false;
-bool latestReceiver = false;
+// Node specific
+
+// used in configuration state
+bool waitingForLight = false; // Is the node waiting for signal
+bool latestReceiver = false;  // Is the node the latest receiver
 
 // Master specific:
-// more than 150 will most likely cause memory issues
-const uint8_t maxNodes = 50;
 
-// For configuration finder and dynamic ids
-uint8_t nextId = 1;   // upto 253, Do not start from 0 as that is for broadcasting
-uint8_t stackTop = 0; // master at bottom
+// more than 150 will most likely cause memory issues
+const uint8_t maxNodes = 50; // What is the max count of nodes in the configuration state stack
+
+// used in configuration state
+uint8_t nextId = 1;   // upto 253, Do not start from 0 as that is reserved for PJON broadcast
+uint8_t stackTop = 0; // Initally master is at top, we use id 0 here for master for simplicity.
 // TODO currentPos should be byte array
-String currentPos = ""; // Keep track of the current position we're in the configuration stage
+String currentPos = ""; // The position the configuration state is checking at that moment. Updated every loop
 
 // For cyclic redundancy check
 const uint8_t crcKey = 7; // This key has to be same on both sides
@@ -68,71 +85,93 @@ CRC8 crc = CRC8(crcKey);
 // Slave functions:
 
 // This function is called whenever a packet is received
+// Each packet expect a bounds packet has an id, located at payload[0] which is used to determine the action.
 void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
-  Serial.println(char(payload[0]));
-  if (char(payload[0]) == start)
+  char command = char(payload[0]);
+
+  if (command == start)
   { // Start configuration state
-    dp.setPinsInput();
-    waitingForLight = true;
+    handleStartPacket();
   }
-  else if (char(payload[0]) == dirToCheck)
+  else if (command == dirToCheck)
   {
-    uint8_t dir = payload[1];
-    directionsToCheck[dir] = true;
+    uint8_t dir = payload[1];      // This direction should be checked after configuration state
+    directionsToCheck[dir] = true; // save that information
   }
-  else if (char(payload[0]) == reset)
-  { // Reset everything
+  else if (command == toInitial)
+  {
     setSelfToInitialMode();
   }
-  else if (char(payload[0]) == idPacket && id == PJON_NOT_ASSIGNED)
-  { // ID
+  else if (command == idPacket && id == PJON_NOT_ASSIGNED)
+  {
     if (latestReceiver)
     {
-      latestReceiver = false;
-      id = payload[1];
-      bus.set_id(id);
-      waitingForLight = false;
-      dp.setPinsInput(); // Set back to input mode. In case disconnecting happens
+      handleIdPacket(payload[1]);
     }
   }
-  else if (char(payload[0]) == dirInstruction)
-  { // New instructions
-    uint8_t dir = payload[1];
-    dp.setPinsInput(); // Reset pins first
-    dp.setPinLow(dir);
+  else if (command == dirInstruction)
+  { // New direction instructions
+    handleDirInstructionPacket(payload[1]);
   }
-  else if (char(payload[0]) == csCompleted)
+  else if (command == csCompleted)
   { // CS completed, interface is ready and configured
-    setDirectionPins();
-    interfaceReady = true;
+    handleCSCompletedPacket();
   }
   else
   { // Bounds struct
-    BoundsData b;
-    memcpy(&b, payload, sizeof(b));
-    if (b.componentType == 'R')
-    {
-      rots[b.componentId].setBounds(b.minValue, b.maxValue, b.stepSize);
-    }
-    else if (b.componentType == 'P')
-    {
-      pots[b.componentId].setBounds(b.minValue, b.maxValue);
-    }
+    handleBoundsPacket(payload);
   }
 }
 
+void handleStartPacket()
+{
+  led.setColor(inConfigurationStateColor);
+  dp.setPinsInput();         // Set all pins to input
+  waitingForLight = true;    // Node should expect a signal.
+}
+
+void handleIdPacket(uint8_t newId)
+{
+  latestReceiver = false;
+  id = newId;
+  bus.set_id(id);
+  waitingForLight = false;
+  dp.setPinsInput(); // Set back to input mode. In case disconnecting happens
+}
+
+void handleDirInstructionPacket(uint8_t dir)
+{
+  dp.setPinsInput(); // All pins to input first
+  dp.setPinLow(dir); // Set given direction to low
+}
+
+void handleCSCompletedPacket()
+{
+  led.setColor(configuredColor); // green
+  setDirectionPins();
+  interfaceReady = true;
+}
+
+void handleBoundsPacket(uint8_t *payload)
+{
+  BoundsData b;
+  memcpy(&b, payload, sizeof(b));
+  setBounds(b);
+}
+
 // Send the Data struct to master
-bool sendData(Data data, bool blocking = false)
+bool sendData(Data data)
 {
   data.nodeId = id;
-  uint16_t packet = blocking ? bus.send_packet_blocking(masterId, &data, sizeof(data)) : bus.send_packet(masterId, &data, sizeof(data));
+  uint16_t packet = bus.send_packet_blocking(masterId, &data, sizeof(data));
   return (packet != PJON_ACK);
 }
 
 // should propably reset component bounds as well
 void setSelfToInitialMode()
 {
+  led.setColor(initialStateColor); // Orange
   interfaceReady = false;
   waitingForLight = false;
   latestReceiver = false;
@@ -143,7 +182,6 @@ void setSelfToInitialMode()
   dp.setPinsInput();
   id = PJON_NOT_ASSIGNED;
   bus.set_id(id);
-  //n = getNode(empty);
 }
 
 // Send initial info
@@ -167,10 +205,35 @@ void setDirectionPins()
   }
 }
 
+void setBounds(BoundsData b)
+{
+  if (b.componentType == 'R')
+  {
+    rots[b.componentId].setBounds(b.minValue, b.maxValue, b.stepSize);
+  }
+  else if (b.componentType == 'P')
+  {
+    pots[b.componentId].setBounds(b.minValue, b.maxValue);
+  }
+}
+
+void setADS()
+{
+  ADS.begin();
+  ADS.setGain(1);     // ±4.096V
+  ADS.setDataRate(7); // Fastest
+}
+
 // Initialize each component
 void initializeComponents()
 {
   ComponentCounts c = getCounts(nt);
+
+  if (c.potCount > 0)
+  {
+    setADS();
+  }
+
   for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
@@ -180,67 +243,55 @@ void initializeComponents()
 
   for (int i = 0; i < c.rotCount; i++)
   {
-    int pin1 = rotPins[i][0];
+    uint8_t pin1 = rotPins[i][0];
     uint8_t pin2 = rotPins[i][1];
     RotaryEncoder rot = RotaryEncoder(pin1, pin2, i);
     rot.activate();
     rots[i] = rot;
+
+    Button button = Button(rotBPins[i], i);
+    button.activate();
+    buttons[i] = button;
   }
 
   for (int i = 0; i < c.butCount; i++)
   {
-    Button button = Button(bPins[i], i);
+    Button button = Button(bPins[i], c.rotCount + i);
     button.activate();
-    buttons[i] = button;
+    buttons[c.rotCount + i] = button;
   }
-}
-
-// Set interupts for rotary encoders, maybe in future for buttons and other comps
-void setInterrupts() {
-   ComponentCounts c = getCounts(nt);
-   for (int i = 0; i < c.rotCount; i++)
-   {
-    attachInterrupt(digitalPinToInterrupt(rotPins[i][0]), updateRots, CHANGE);
-   }
-   interruptsSet = true;
-}
-
-void updateRots() {
-   ComponentCounts c = getCounts(nt);
-   for (int i = 0; i < c.rotCount; i++)
-   {
-    rots[i].update();
-   }
 }
 
 void load()
 {
-  EEPROM.get(0,nt);
-  if (nt == 0) return;
-  configured = true;
-  Serial.println("configuration loaded");
-//  //Serial.flush();
+  EEPROM.get(0, nt);
+  if (nt == 0)
+    return;
+  hasType = true;
+  if (whichSerial == -1)
+    Serial.println("configuration loaded");
 }
 
 void save()
 {
   EEPROM.put(0, nt);
-  Serial.println("Configuration saved");
-//  //Serial.flush();
+  if (whichSerial == -1)
+    Serial.println("Configuration saved");
 }
 
 // Check if potentiometers have changed
-void checkPots(bool blocking = false)
+void checkPots()
 {
   ComponentCounts c = getCounts(nt);
   for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = pots[i];
-//    pots[i] = pot;
-    if (pot.hasChanged() || blocking)
+    double val = pot.getValue(ADS);
+    if (pot.hasChanged())
     {
+      led.setColor(sendingDataColor);
       Data data;
-      data.value = pot.getValue();
+      data.value = val;
       data.id = pot.getId();
       data.type = pot.getType();
       if (isMaster)
@@ -250,8 +301,10 @@ void checkPots(bool blocking = false)
         toSerialWithCRC(dataS);
       }
       else
-        sendData(data, blocking);
+        sendData(data);
     }
+    led.setColor(configuredColor); // green
+    pots[i] = pot;
   }
 };
 
@@ -261,9 +314,12 @@ void checkRots()
   for (int i = 0; i < c.rotCount; i++)
   {
     RotaryEncoder rot = rots[i];
-    if (rot.hasChanged()){
+    double val = rot.getValue();
+    if (rot.hasChanged())
+    {
+      led.setColor(sendingDataColor);
       Data data;
-      data.value = rot.getValue();
+      data.value = val;
       data.id = rot.getId();
       data.type = rot.getType();
       rots[i] = rot;
@@ -276,19 +332,21 @@ void checkRots()
       else
         sendData(data);
     }
+    led.setColor(configuredColor); // green
+    rots[i] = rot;
   }
 }
 
-void checkButtons(bool blocking = false)
+void checkButtons()
 {
   ComponentCounts c = getCounts(nt);
-  for (int i = 0; i < c.butCount; i++)
+  for (int i = 0; i < c.butCount + c.rotCount; i++)
   {
     Button button = buttons[i];
     double value = button.getValue();
-    buttons[i] = button;
-    if (button.hasChanged() || blocking)
+    if (button.hasChanged())
     {
+      led.setColor(sendingDataColor);
       Data data;
       data.value = value;
       data.id = button.getId();
@@ -300,8 +358,10 @@ void checkButtons(bool blocking = false)
         toSerialWithCRC(dataS);
       }
       else
-        sendData(data, blocking);
+        sendData(data);
     }
+    led.setColor(configuredColor); // green
+    buttons[i] = button;
   }
 }
 
@@ -325,92 +385,117 @@ int8_t checkNodes()
 // if nothing is available return 0
 char checkSerial()
 {
-  if (Serial.available() > 0)
-  {
-    return Serial.read();
+  if (whichSerial == 0)
+  { // checkboth
+    if (Serial.available() > 0)
+    {
+      whichSerial = -1;
+      return Serial.read();
+    }
+    if (webusbSerial.available() > 0)
+    {
+      whichSerial = 1;
+      return webusbSerial.read();
+    }
   }
+  else if (whichSerial == 1 && webusbSerial.available() > 0)
+    return webusbSerial.read();
+  else if (whichSerial == -1 && Serial.available() > 0)
+    return Serial.read();
+
   return 0; // NUL
 }
 
 void setup()
 {
+  led.setColor(initialStateColor);
   Serial.begin(9600);
+  webusbSerial.begin(9600);
   load();
   initializeComponents();
-  setup_slave();
+  if (!isMaster)
+    setup_slave();
 }
 
 void setup_master()
 {
-    id = masterId;
-    bus.strategy.set_pins(outputPin, inputPin);
-    bus.set_receiver(receiver_function_master);
-    bus.begin();
-    bus.set_id(id);
+  id = masterId;
+  bus.strategy.set_pins(outputPin, inputPin);
+  bus.set_receiver(receiver_function_master);
+  bus.begin();
+  bus.set_id(id);
 
-    uint8_t packet[1] = {reset};
-    bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
+  uint8_t packet[1] = {toInitial};
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 }
 
 void setup_slave()
 {
-     bus.strategy.set_pins(inputPin, outputPin);
-     bus.set_receiver(receiver_function_slave);
-     bus.begin();
-     bus.set_id(id);
+  bus.strategy.set_pins(inputPin, outputPin);
+  bus.set_receiver(receiver_function_slave);
+  bus.begin();
+  bus.set_id(id);
 
-     uint8_t packet[1] = {nodeConnected};
-     bus.send_packet_blocking(masterId, packet, 1); // What if no master yet
+  uint8_t packet[1] = {nodeConnected};
+  bus.send_packet_blocking(masterId, packet, 1);
 }
 
 void loop()
 {
   char serial = checkSerial();
-  
+
   if (serial == configure)
   {
-    uint8_t type = Serial.parseInt();
-    //todo Vaidate type
+    uint8_t type = (whichSerial == -1) ? Serial.parseInt() : webusbSerial.parseInt();
+    //todo Validate type
     nt = type;
     save();
   }
 
- if (!interfaceReady)
+  if (!interfaceReady)
   {
     if (serial == start)
     {
+      led.setColor(inConfigurationStateColor);
       isMaster = true;
       setup_master();
       runConfiguration();
     }
   }
-  
-  if (!configured) {
+
+  if (!hasType)
+  {
     return;
   }
-  
-  bus.receive(1500);
-  
-  if (isMaster){
-     masterLoop(serial);
+
+  bus.receive(350);
+
+  if (isMaster)
+  {
+    masterLoop(serial);
   }
-  else {
+  else
+  {
     slaveLoop();
   }
-
   if (!interfaceReady)
     return;
 
-  if (!interruptsSet)
-    setInterrupts();
-    
   // Check for changing values in components
-  bus.receive(1500);
-  checkPots(); //TODO ADC
-  bus.receive(1500);
-  checkRots(); // TODO update rot and getValue rot also... dynamic steps
+  bus.receive(350);
+  checkPots();
+  checkRots();
   checkButtons();
-  
+
+  bus.receive(150);
+
+  handleDisconnectedNodes();
+
+  bus.receive(150);
+};
+
+void handleDisconnectedNodes()
+{
   // Check for disconnected nodes
   int8_t disconnectedNode = checkNodes();
   if (disconnectedNode >= 0)
@@ -426,106 +511,152 @@ void loop()
       bus.send_packet_blocking(masterId, content, 3);
     }
   }
-};
+}
 
 void masterLoop(char serial)
 {
-  if (!interfaceReady) return;
+  if (!interfaceReady)
+    return;
   if (serial == quit)
   {
-    interfaceReady = false;
-    uint8_t packet[1] = {reset};
-    bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
-    stackTop = 0;
-    nextId = 1;
+    handleQuitSerial();
     return;
   }
 
   if (serial == bounds)
-  { // Parse the string
-    BoundsData b;
-    char input[SERIAL_SIZE + 1];
-    byte size = Serial.readBytes(input, SERIAL_SIZE);
-    // Add the final 0 to end the C string
-    input[size] = 0;
+  {
+    handleBoundsSerial();
+  }
+}
 
-    // Read each value
-    char *val = strtok(input, ":");
-    uint8_t nodeId = atoi(val);
-    val = strtok(0, ":");
-    b.componentType = val[0];
-    val = strtok(0, ":");
-    b.componentId = atoi(val);
-    val = strtok(0, ":");
-    b.minValue = atof(val);
-    val = strtok(0, ":");
-    b.maxValue = atof(val);
-    val = strtok(0, ":");
-    b.stepSize = atof(val);
+void handleQuitSerial()
+{
+  led.setColor(initialStateColor);
+  interfaceReady = false;
+  uint8_t packet[1] = {toInitial};
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
+  stackTop = 0;
+  nextId = 1;
+  whichSerial = 0;
+}
+
+void handleBoundsSerial()
+{
+  BoundsData b;
+  char input[SERIAL_SIZE + 1];
+  byte size = (whichSerial == -1) ? Serial.readBytes(input, SERIAL_SIZE) : webusbSerial.readBytes(input, SERIAL_SIZE);
+  // Add the final 0 to end the C string
+  input[size] = 0;
+
+  // Read each value
+  char *val = strtok(input, ":");
+  uint8_t nodeId = atoi(val);
+  val = strtok(0, ":");
+  b.componentType = val[0];
+  val = strtok(0, ":");
+  b.componentId = atoi(val);
+  val = strtok(0, ":");
+  b.minValue = atof(val);
+  val = strtok(0, ":");
+  b.maxValue = atof(val);
+  val = strtok(0, ":");
+  b.stepSize = atof(val);
+
+  if (nodeId == masterId || nodeId == 0)
+    setBounds(b);
+  else
     sendBounds(b, nodeId);
-  } 
 }
 
 void slaveLoop()
 {
-  if (!interfaceReady)
-  {  
-    if (waitingForLight)
-    {
-      if (dp.isAnyPinLow())
-      {
-        latestReceiver = true;
-        sendComponentInfo();
-        bus.receive(2500);
-      }
-    }
+  checkForSignal();
+}
+
+void checkForSignal()
+{
+  if (interfaceReady)
+    return;
+
+  if (!waitingForLight)
+    return;
+
+  if (dp.isAnyPinLow())
+  {
+    latestReceiver = true;
+    sendComponentInfo();
+    bus.receive(2500);
   }
 }
 
 // Master functions:
+
 void receiver_function_master(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
   if (char(payload[0]) == nodeInfo)
   { // OK: Node received data in configuration state and send component info
-    String info = String(nodeInfo);
-    info += " ";
-    info += nextId;
-    info += ":";
-    info += payload[1];
-    info += ":";
-    info += (currentPos);
-    info += " ";
-    toSerialWithCRC(info);
+    sendNodeInfo(nextId, int(payload[1]), currentPos);
   }
+
   if (interfaceReady)
   {
-      if (char(payload[0]) == nodeConnected)
-      { // A node connected
-        Serial.println(nodeConnected);
-        interfaceReady = false;
-        runConfiguration();
-      }
-      else if (char(payload[0]) == nodeDisconnected)
-      { // A node disconnected
-        uint8_t nodeId = payload[1];
-        uint8_t dir = payload[2];
-        disconnectedNodeToSerial(nodeId, dir);
-      }
-      else
-      { // Node sending data, figure out a better way
-        Data data;
-        memcpy(&data, payload, sizeof(data));
-        String dataS = dataToString(data);
-        toSerialWithCRC(dataS);
-      }
+    if (char(payload[0]) == nodeConnected)
+    { // A node connected
+      handleNodeConnection();
+    }
+    else if (char(payload[0]) == nodeDisconnected)
+    { // A node disconnected
+      handleNodeDisconnection(payload[1], payload[2]);
+    }
+    else
+    { // Node sending data, figure out a better way
+      handleDataPacket(payload);
+    }
   }
 };
+
+void handleNodeConnection()
+{
+  Serial.println(nodeConnected);
+  webusbSerial.println(nodeConnected);
+  webusbSerial.flush();
+}
+
+void handleNodeDisconnection(uint8_t nid, uint8_t dir)
+{
+  disconnectedNodeToSerial(nid, dir);
+}
+
+void handleDataPacket(uint8_t *payload)
+{
+  Data data;
+  memcpy(&data, payload, sizeof(data));
+  String dataS = dataToString(data);
+  toSerialWithCRC(dataS);
+}
+
+// TODO get rid of string its slow
+void sendNodeInfo(uint8_t id, uint8_t nt, String pos)
+{
+  String info = String(nodeInfo);
+  info += " ";
+  info += id;
+  info += ":";
+  info += nt;
+  info += ":";
+  info += pos;
+  info += " ";
+  toSerialWithCRC(info);
+}
 
 // Configuration checking
 void runConfiguration()
 {
+  // send own info
+  sendNodeInfo(masterId, nt, "-1");
+
   // Make sure base values are correct, incase running configuration again
-  uint8_t packet[1] = {reset};
+  uint8_t packet[1] = {toInitial};
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1); // Make sure slaves also reset their attributes
   interfaceReady = false;
   nextId = 1;
@@ -541,8 +672,13 @@ void runConfiguration()
   dp.setPinsInput();
 
   //Configuration done
-  Serial.println(csCompleted);
-  //Serial.flush();
+  if (whichSerial == 1)
+  {
+    webusbSerial.println(csCompleted);
+    webusbSerial.flush();
+  }
+  else if (whichSerial == -1)
+    Serial.println(csCompleted);
 
   // Let the slaves know that configuration is done
   packet[0] = csCompleted;
@@ -652,8 +788,17 @@ void toSerialWithCRC(String s)
   uint8_t data[s.length() + 1];
   s.getBytes(data, s.length() + 1);
   uint8_t crc8 = crc.getCRC8(data, s.length());
-  Serial.print(s);
-  Serial.print(" ");
-  Serial.println(crc8);
-  //Serial.flush();
+  if (whichSerial == 1)
+  {
+    webusbSerial.print(s);
+    webusbSerial.print(" ");
+    webusbSerial.println(crc8);
+    webusbSerial.flush();
+  }
+  else if (whichSerial == -1)
+  {
+    Serial.print(s);
+    Serial.print(" ");
+    Serial.println(crc8);
+  }
 }

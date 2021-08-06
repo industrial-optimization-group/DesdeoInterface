@@ -1,5 +1,5 @@
 /*
-Button.h - A library for a button component
+    Button.h - A library for a button component used in the physical interface
 */
 
 #ifndef Button_h
