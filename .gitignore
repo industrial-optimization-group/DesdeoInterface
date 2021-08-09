@@ -1,5 +1,6 @@
 https/
 .vscode/
+*.drawio
 
 __pycache__/
 *.py[cod]

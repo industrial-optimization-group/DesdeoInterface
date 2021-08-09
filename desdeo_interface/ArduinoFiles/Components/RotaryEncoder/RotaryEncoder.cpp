@@ -10,6 +10,9 @@ RotaryEncoder::RotaryEncoder(uint8_t pin1, uint8_t pin2, uint8_t id): Component(
 {
     _pin0 = pin1;
     _pin1 = pin2;
+    pinMode(_pin0, INPUT_PULLUP);
+    pinMode(_pin1, INPUT_PULLUP);
+    _prevState = digitalRead(_pin0);
     _prevValue = 0;
 };
 
@@ -20,14 +23,13 @@ RotaryEncoder::RotaryEncoder(uint8_t pin1, uint8_t pin2, uint8_t id): Component(
  *
  *  returns: The value of the rotary encoder
  */
-
-double RotaryEncoder::getValue()
+float RotaryEncoder::getValue()
 {
     bool p1 = digitalRead(_pin0);
     bool p2 = digitalRead(_pin1);
     if (p1 != _prevState && p1 == 0) {
         int8_t dir = ((p1 != p2) ? -1 : 1);
-        double step = _stepSize * dir;
+        float step = _stepSize * dir;
         _prevValue += step;
         if (_prevValue > _max) _prevValue = _min;
         else if (_prevValue < _min) _prevValue = _max;
@@ -49,20 +51,10 @@ double RotaryEncoder::getValue()
  *  max: Maximum value the rotary encoder can achieve
  *  stepSize: How much does the value increase/decrease by one rotation
  */
-
-void RotaryEncoder::setBounds(double min, double max, double stepSize) 
+void RotaryEncoder::setBounds(float min, float max, float stepSize) 
 {
     if (min >= max) return;
     _min = min;
     _max = max;
     _stepSize = stepSize;
-}
-
-
-// This could be removed back to constructor
-void RotaryEncoder::activate() 
-{
-    pinMode(_pin0, INPUT_PULLUP);
-    pinMode(_pin1, INPUT_PULLUP);
-    _prevState = digitalRead(_pin0);
 }

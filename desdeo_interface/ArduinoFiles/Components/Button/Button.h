@@ -12,12 +12,11 @@ class Button: public Component
 {
 public:
     Button() {}
-    Button( int pin, uint8_t id);
-    double getValue();
-    void activate();
+    Button(uint8_t pin, uint8_t id);
+    float getValue();
 
 private:
-    int _pin;
+    uint8_t _pin;
 };
 
 #endif

@@ -11,7 +11,7 @@ class CRC8
 {
 public:
     CRC8(uint8_t divisor);
-    uint8_t getCRC8(uint8_t *data, int n);
+    uint8_t getCRC8(uint8_t *data, uint8_t n);
 
 private:
     uint8_t _divisor;

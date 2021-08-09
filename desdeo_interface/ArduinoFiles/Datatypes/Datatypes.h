@@ -92,11 +92,11 @@ const char bounds = 'B'; // A bounds struct packet
 /**
  * Different state colors
  */
-
 const uint8_t initialStateColor[3] = {255, 0, 0}; // RED
 const uint8_t configuredColor[3] = {0, 255, 0}; // GREEN
 const uint8_t sendingDataColor[3] = {0, 255, 0}; // BLUE
 const uint8_t inConfigurationStateColor[3] = {255, 0, 255}; // MAGENTA
+
 
 /*
  * Function: getCounts 

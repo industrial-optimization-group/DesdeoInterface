@@ -13,17 +13,16 @@ class Potentiometer: public Component
 public:
     Potentiometer() {}
     Potentiometer(uint8_t analogPin, uint8_t id);
-    double getValue(ADS1115 adc); // Interupt kind of thing could be added
-    double getValue() {return 0;} // Could be removed
-    void setBounds(double max, double min);
-    void activate();
-    
+    float getValue(ADS1115 adc); // Interupt kind of thing could be added
+    float getValue() {return 0;} // Could be removed
+    void setBounds(float max, float min);
+
 private:
     uint16_t filter(uint16_t value);
-    double scale(double value, double min, double max);
+    float scale(float value, float min, float max);
     int _pin;
-    double _min = 0;
-    double _max = 0;
+    float _min = 0;
+    float _max = 0;
     long _lastRead = 0;
 };
 

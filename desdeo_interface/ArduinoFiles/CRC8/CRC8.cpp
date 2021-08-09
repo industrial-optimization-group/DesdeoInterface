@@ -43,7 +43,7 @@ CRC8::CRC8(uint8_t divisor) {
  *
  * returns: The crc8 checksum
  */
-uint8_t CRC8::getCRC8(uint8_t *data, int n) {
+uint8_t CRC8::getCRC8(uint8_t *data, uint8_t n) {
     uint8_t crc = 0;
     for (int i = 0; i < n; i++) {
         crc = data[i] ^ crc;

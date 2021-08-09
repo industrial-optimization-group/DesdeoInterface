@@ -15,12 +15,12 @@ public:
     bool hasChanged();
     uint8_t getId();
     char getType();
-    virtual double getValue() = 0;
-    virtual void activate() = 0;
+    void setValue(float val) {_prevValue = val;}
+    virtual float getValue() = 0;
 
 protected:
     bool _hasChanged;
-    double _prevValue;
+    float _prevValue;
 
 private:
     uint8_t _id;

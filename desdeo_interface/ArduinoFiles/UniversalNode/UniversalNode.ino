@@ -72,7 +72,7 @@ bool latestReceiver = false;  // Is the node the latest receiver
 // Master specific:
 
 // more than 150 will most likely cause memory issues
-const uint8_t maxNodes = 50; // What is the max count of nodes in the configuration state stack
+const uint8_t maxNodes = 100; // What is the max count of nodes in the configuration state stack. This not same as max nodes in total
 
 // used in configuration state
 uint8_t nextId = 1;   // upto 253, Do not start from 0 as that is reserved for PJON broadcast
@@ -85,18 +85,18 @@ const uint8_t crcKey = 7; // This key has to be same on both sides
 CRC8 crc = CRC8(crcKey);
 
 
-// Slave functions:
+// Node functions:
 
 /*
- * Function: receiver_function_slave 
+ * Function: receiver_function_node
  * --------------------
- * Is called whenever a slave receives a packet.
+ * Is called whenever a node receives a packet.
  * 
  * payload: packet
  * length: packet length
  * packet_info: A pjon packet info that contains information on packet. Not used
  */
-void receiver_function_slave(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
+void receiver_function_node(uint8_t *payload, uint16_t length, const PJON_Packet_Info &packet_info)
 {
   char command = char(payload[0]); // packet id
 
@@ -322,7 +322,7 @@ void initializeComponents()
   for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
-    pot.activate();
+//    pot.activate();
     pots[i] = pot;
   }
 
@@ -331,18 +331,18 @@ void initializeComponents()
     uint8_t pin1 = rotPins[i][0];
     uint8_t pin2 = rotPins[i][1];
     RotaryEncoder rot = RotaryEncoder(pin1, pin2, i);
-    rot.activate();
+//    rot.activate();
     rots[i] = rot;
 
     Button button = Button(rotBPins[i], i);
-    button.activate();
+//    button.activate();
     buttons[i] = button;
   }
 
   for (int i = 0; i < c.butCount; i++)
   {
     Button button = Button(bPins[i], c.rotCount + i);
-    button.activate();
+//    button.activate();
     buttons[c.rotCount + i] = button;
   }
 }
@@ -569,14 +569,14 @@ void setup_master()
 }
 
 /*
- * Function: setup_slave
+ * Function: setup_node
  * --------------------
  * Setups a node. Mainly resposible of setting the id and pjon bus.
  */
 void setup_node()
 {
   bus.strategy.set_pins(inputPin, outputPin);
-  bus.set_receiver(receiver_function_slave);
+  bus.set_receiver(receiver_function_node);
   bus.begin();
   bus.set_id(id);
 
@@ -880,7 +880,7 @@ void runConfiguration()
 
   // Make sure base values are correct, incase running configuration again
   uint8_t packet[1] = {toInitial};
-  bus.send_packet_blocking(PJON_BROADCAST, packet, 1); // Make sure slaves also reset their attributes
+  bus.send_packet_blocking(PJON_BROADCAST, packet, 1); // Make sure nodes also reset their attributes
   interfaceReady = false;
   nextId = 1;
   stackTop = 0;
@@ -903,7 +903,7 @@ void runConfiguration()
   else if (whichSerial == -1)
     Serial.println(csCompleted);
 
-  // Let the slaves know that configuration is done
+  // Let the nodes know that configuration is done
   packet[0] = csCompleted;
   bus.send_packet_blocking(PJON_BROADCAST, packet, 1);
 }
@@ -928,7 +928,7 @@ void configuration(StackPair stack[maxNodes])
       return;
     }
     else
-    { // Slave has checked all its directions
+    { // Node has checked all its directions
       stackTop--;
     }
     return;
@@ -940,17 +940,17 @@ void configuration(StackPair stack[maxNodes])
     dp.setPinLow(dir);
   }
   else
-  { //  slave from stack
+  { //  Node from stack
     uint8_t content[2] = {dirInstruction, dir};
-    bus.send_packet_blocking(stack[stackTop].nodeId, content, 2); // send instruction to slave
-    // The slave will react by setting the corresponding pin to high
+    bus.send_packet_blocking(stack[stackTop].nodeId, content, 2); // send instruction to Node
+    // The Node will react by setting the corresponding pin to high
   }
 
   uint16_t response = bus.receive(50000); // 0.05 seconds
   if (response == PJON_ACK)
   { // Someone received the data. The receiver should have the isReceiver set to True now
     uint8_t content2[2] = {idPacket, nextId};
-    bus.send_packet_blocking(PJON_BROADCAST, content2, 2); // Send the id to the slave
+    bus.send_packet_blocking(PJON_BROADCAST, content2, 2); // Send the id to the node
     if (stackTop == 0)
     {
       directionsToCheck[dir] = true;
