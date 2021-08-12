@@ -1,6 +1,8 @@
 # Physical interface for desdeo framework
 
-Currently the nodes communicate with each other using the [PJON software bitbang](https://www.pjon.org/SoftwareBitBang.php) protocol. 
+A modular physical interface for preference input from decision-maker for solving multiobjective optimization problems and decision making.
+
+[//]: # (Currently the nodes communicate with each other using the [PJON software bitbang](https://www.pjon.org/SoftwareBitBang.php) protocol. 
 Each node has it's own dynamically assigned unique id which the master is aware of. This allows the master to communicate with a specific node. The master also knows the location and connected components of each node. 
 
 In configuration state (CS) each node is assigned an id by the master and each node sends it basic information to master (atm: How many components of each type it has).
@@ -16,4 +18,4 @@ Each node, including the master, has 4 digital pins reserved for each direction 
 
 In addition to direction pins each node also needs 2 digital pins (ATmega32u4 supports pins 2,4,8,12) for communication, in 4/out 8. The master communicates through serial so pins tx/rx should be left empty.
 
-![Schematic of a node](doc/Schematics/node_schematic_v0_1.png)
+![Schematic of a node](doc/Schematics/node_schematic_v0_1.png) )

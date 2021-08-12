@@ -3,15 +3,13 @@ and from there to Serial in the configuration state. This allows identification 
 
 A nodes type can be changed at any point with the 'F' Serial command which takes 'isMaster' and 'nodeType' as arguments, see [PacketIds](../PacketIds) for further details on different commands. 
 
-| NodeType      | type                |
-| ------------- | -------------       |
-| 0             | Empty               |
-| 1             | Master              |
-| 2             | One potentiometer   |
-| 3             | One rotary encoder  |
-| 4             | One button          |
-| 5             | Screen              |
-| 6             | Two potentiometers  |
+| NodeType      | type                 | explanation             |
+| ------------- | -------------        | -------------           |
+| 0             | Empty                | Has nothing             |
+| 1             | Simple button        | Has only a button       |
+| 2             | Simple potentiometer | Has only a potentiometer|
+| 3             | Simple rotary encoder| Has only a rotary encoder, a rotary encoder also has a switch builtin so a simple rotary encoder is a rotary encoder + button|
+
 
 This is needed because we are using the same code for each node so to avoid sending false values etc we tell each node
 which pins should be used. 
@@ -19,3 +17,4 @@ Because of this each component must always be in the same pin(s) meaning that th
 
 A drawback to this (at least for the moment) is that adding new types means that we have to add them to the datatypes.h file AND to the other side of the Serial port.
 One way to tackle this would be to have some file for each type: This might be more complicated than what is sounds...
+OR the read the pin values of each component to see if they are floating or correct (i.e should be low but is high). Might get complicated with more complex components such as screens.

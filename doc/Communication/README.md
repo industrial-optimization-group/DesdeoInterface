@@ -56,3 +56,5 @@ All lines written to serial should be of form "ID dataString CRC".
 | D             | Node disconnected   | M -> S     | id:dir             |
 | V             | Component value     | M -> S     | nId:type:cId:value |
 | B             | Bounds for node     | M -> S     | nId:compType:compId:minValue:maxValue:stepSize | 
+
+*Any node can get the configuration command from serial not only the master!
