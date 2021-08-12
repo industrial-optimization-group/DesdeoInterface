@@ -2,7 +2,8 @@
 
 A modular physical interface for preference input from decision-maker for solving multiobjective optimization problems and decision making.
 
-[//]: # (Currently the nodes communicate with each other using the [PJON software bitbang](https://www.pjon.org/SoftwareBitBang.php) protocol. 
+<!---
+(Currently the nodes communicate with each other using the [PJON software bitbang](https://www.pjon.org/SoftwareBitBang.php) protocol. 
 Each node has it's own dynamically assigned unique id which the master is aware of. This allows the master to communicate with a specific node. The master also knows the location and connected components of each node. 
 
 In configuration state (CS) each node is assigned an id by the master and each node sends it basic information to master (atm: How many components of each type it has).
@@ -18,4 +19,26 @@ Each node, including the master, has 4 digital pins reserved for each direction 
 
 In addition to direction pins each node also needs 2 digital pins (ATmega32u4 supports pins 2,4,8,12) for communication, in 4/out 8. The master communicates through serial so pins tx/rx should be left empty.
 
-![Schematic of a node](doc/Schematics/node_schematic_v0_1.png) )
+![Schematic of a node](doc/Schematics/node_schematic_v0_1.png) --->
+
+## TODO 
+
+### React / javascript
+* Handle disconnection/quitting
+* Handle errors
+* Verify node drawing works as intended
+* Handle drawing disconnected nodes properly:
+    * Instead of outlining just the one that disconnected, outline each one that might of disconnected as well
+    because of the disconnection
+    * i.e. 3 nodes side by side => master - node 1 - node 2. Say node 1 disconnected then also node 2 disconnects...
+* Make it pretty
+* Add crc check
+
+### Arduino side
+* A set value function for each component might be a good idea
+    * How to send these values as we're already sending a struct type without id
+* Send pjon struct packets with an id.
+    * Currently only sending one struct => it can be identified as it is the only packet without an id
+* ADS seems to cause some issues sometimes as getting values takes too long and the node misses receiving data
+* Same issue with interrupts so I removed interrupts, you might want to include that again, not sure
+    * i.e. Constantly changing rot values will call interrupt function over and over again -> not receiving/sending data.
