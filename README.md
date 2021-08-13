@@ -21,6 +21,16 @@ In addition to direction pins each node also needs 2 digital pins (ATmega32u4 su
 
 ![Schematic of a node](doc/Schematics/node_schematic_v0_1.png) --->
 
+## Setup libraries
+* From [desdeo_interface/ArduinoFiles](desdeo_interface/ArduinoFiles) copy all modules (folders with no sub folders, i.e. CRC8) except UniversalNode to the arduino libraries folder.
+    * (TODO: Figure out relative imports)
+    * If modifying these files, you must copy the modified file again to the libraries folder (relative would handle this).
+* From the arduino library manager install PJON and ADS1X15.
+* To install webusb follow the installation guide: [https://github.com/webusb/arduino](https://github.com/webusb/arduino) 
+    * Uploading webusb code requires upgrading device USB 2.0 to USB 2.1. This requires changing a line in a header file.
+    * (windows) After the upgrade one must include the webusb library in the sketch. Uploading a sketch without the library will cause windows to not recognize the device. To fix this you can upload a sketch from a linux/mac pc. 
+* After this you should be able to upload the UniversalNode sketch to a webusb supported board.
+
 ## TODO 
 
 ### React / javascript
