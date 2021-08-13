@@ -296,13 +296,14 @@ void setBounds(BoundsData b)
  * Function: setADS
  * --------------------
  * Initializes the ADS module
- * Only called if the node has an potentiometer.
+ * Only called if the node has a potentiometer.
+ * see https://github.com/RobTillaart/ADS1X15 for more details
  */
 void setADS()
 {
   ADS.begin();
   ADS.setGain(1);     // ±4.096V
-  ADS.setDataRate(7); // Fastest
+  ADS.setDataRate(4); // Default, 0 slowest, 7 fastest
 }
 
 /*
@@ -322,7 +323,6 @@ void initializeComponents()
   for (int i = 0; i < c.potCount; i++)
   {
     Potentiometer pot = Potentiometer(potPins[i], i);
-//    pot.activate();
     pots[i] = pot;
   }
 
@@ -331,18 +331,15 @@ void initializeComponents()
     uint8_t pin1 = rotPins[i][0];
     uint8_t pin2 = rotPins[i][1];
     RotaryEncoder rot = RotaryEncoder(pin1, pin2, i);
-//    rot.activate();
     rots[i] = rot;
 
     Button button = Button(rotBPins[i], i);
-//    button.activate();
     buttons[i] = button;
   }
 
   for (int i = 0; i < c.butCount; i++)
   {
     Button button = Button(bPins[i], c.rotCount + i);
-//    button.activate();
     buttons[c.rotCount + i] = button;
   }
 }

@@ -25,16 +25,18 @@ Potentiometer::Potentiometer(uint8_t pin,  uint8_t id): Component(id, 'P')
  */
 float Potentiometer::getValue(ADS1115 adc)
 {
-    uint16_t analogVal = _prevValue;
+    int analogVal = _prevValue;
     long m = millis();
-    if (m - _lastRead >= 150 && adc.isReady()) // Read only every 150ms
+    if (m - _lastRead >= 250 && adc.isReady()) // Read only every 250ms
     {
-    _lastRead = m;
-    analogVal = adc.readADC(_pin);
+        _lastRead = m;
+        analogVal = adc.readADC(_pin);
+        if (analogVal < 0) analogVal = 0;
     }
 
     //analogVal = filter(analogVal);
     _hasChanged = (abs(_prevValue-analogVal) > 100);
+
     if (_hasChanged)
         _prevValue = analogVal;
     return scale(analogVal, _min, _max);

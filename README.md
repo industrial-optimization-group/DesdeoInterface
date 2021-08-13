@@ -24,6 +24,8 @@ In addition to direction pins each node also needs 2 digital pins (ATmega32u4 su
 ## TODO 
 
 ### React / javascript
+* Reconfiguring resets roles... would be better if it didn't
+* Use the states better
 * Handle disconnection/quitting
 * Handle errors
 * Verify node drawing works as intended
