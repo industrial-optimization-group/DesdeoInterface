@@ -303,7 +303,7 @@ void setADS()
 {
   ADS.begin();
   ADS.setGain(1);     // ±4.096V
-  ADS.setDataRate(4); // Default, 0 slowest, 7 fastest
+  ADS.setDataRate(4); // 4 Default, 0 slowest, 7 fastest
 }
 
 /*
