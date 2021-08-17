@@ -13,7 +13,8 @@ You could make this an own package but for now/simplicity:
 * The module assumes that important action buttons such as set/iterate and input fields have an id
     * Objective input field ids should match the objective names of the activeProblemInfo.
     * buttons/toggles ids can be adjusted but make sure they match the ids in the Interface.js file
-        * ```
+        * 
+        ```
         let iterateB = document.getElementById("iterate");
         let setB = document.getElementById("set");
         let satisfiedSwitch = document.getElementById("satisfied-switch");
