@@ -7,14 +7,19 @@ You could make this an own package but for now/simplicity:
 * Create the PhysicalInterface component.
     * I'd suggest adding it to the end of the page
     * And only rendering it if showFinal is false and fetchedInfo is true: 
+    ```
      {!showFinal && fetchedInfo && <PhysicalInterface problem={activeProblemInfo}></PhysicalInterface>}
+     ```
 * The module assumes that important action buttons such as set/iterate and input fields have an id
     * Objective input field ids should match the objective names of the activeProblemInfo.
     * buttons/toggles ids can be adjusted but make sure they match the ids in the Interface.js file
-        *   let iterateB = document.getElementById("iterate");
-            let setB = document.getElementById("set");
-            let satisfiedSwitch = document.getElementById("satisfied-switch");
-            let stopB = document.getElementById("stop");
+        * ```
+        let iterateB = document.getElementById("iterate");
+        let setB = document.getElementById("set");
+        let satisfiedSwitch = document.getElementById("satisfied-switch");
+        let stopB = document.getElementById("stop");
+        ```
+
 
 
 ### How to use
