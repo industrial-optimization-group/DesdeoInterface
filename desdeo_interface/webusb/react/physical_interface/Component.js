@@ -11,6 +11,8 @@ function Comp(props) {
     const id = props.nodeId;
     const cid = props.cid;
 
+    console.log(type + cid)
+
     let roles = type === 'B' ? [
         "Assign role",
         "iterate",
@@ -32,7 +34,7 @@ function Comp(props) {
 
     return (
             <Form>
-                <Form.Text style={{fontSize:18}}> {"Component: " + type + "\tvalue: " + value}</Form.Text>
+                <Form.Text style={{fontSize:18}}> {"Component: " + type + cid + ":\tValue: " + value}</Form.Text>
                 <Form.Control
                         as="select"
                         onChange={setRole}

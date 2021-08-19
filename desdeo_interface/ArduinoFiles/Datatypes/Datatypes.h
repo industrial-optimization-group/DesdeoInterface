@@ -58,10 +58,12 @@ typedef struct
  * In case an invalid nodetype is assigned the node will assume to be empty
  */
 enum NodeType {
-    empty = 0, // Has nothing
+    empty = 0, // Has nothing, can be used for testing
     button = 1, // Has only a button connected
     potentiometer = 2, // Has only a potentiometer connected
     rotaryEncoder = 3, // Has only a rotary encoder connected
+    potentiometerButton = 4, // Has a potentiometer + button
+    rotaryencoderButton = 5, // Rotary encoder + button
 };
 
 /**
@@ -120,6 +122,14 @@ ComponentCounts getCounts(NodeType n)
         counts.potCount = 1;
         break;
     case rotaryEncoder:
+        counts.rotCount = 1;
+        break;
+    case potentiometerButton:
+        counts.butCount = 1;
+        counts.potCount = 1;
+        break;
+    case rotaryencoderButton:
+        counts.butCount = 1;
         counts.rotCount = 1;
         break;
     default: 

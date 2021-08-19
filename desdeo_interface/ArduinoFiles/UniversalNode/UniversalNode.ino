@@ -52,6 +52,8 @@ uint8_t id = PJON_NOT_ASSIGNED; // Temporary id, until gets assigned a unique id
 PJONSoftwareBitBang bus(id);    // Instansiate the PJON bus
 const uint8_t outputPin = 8;    // For master this is 4
 const uint8_t inputPin = 4;     // For master this is 8
+bool oneWire = false; // Optionally use only one wire (in D4) for pjon communication
+
 const uint8_t masterId = 254;   // Master id. which always know by every node and doesn't ever change
 
 bool interfaceReady = false; // Is the initial configuration done
@@ -302,7 +304,7 @@ void setBounds(BoundsData b)
 void setADS()
 {
   ADS.begin();
-  ADS.setGain(1);     // ±4.096V
+  ADS.setGain(0);     // ±4.096V
   ADS.setDataRate(4); // 4 Default, 0 slowest, 7 fastest
 }
 
@@ -544,7 +546,7 @@ void setup()
   webusbSerial.begin(9600);
   load();
   initializeComponents();
-  if (!isMaster)
+  if (!isMaster) // useless check?
     setup_node();
 }
 
@@ -556,7 +558,9 @@ void setup()
 void setup_master()
 {
   id = masterId;
-  bus.strategy.set_pins(outputPin, inputPin);
+  oneWire ? bus.strategy.set_pin(inputPin) : 
+            bus.strategy.set_pins(outputPin, inputPin);
+            
   bus.set_receiver(receiver_function_master);
   bus.begin();
   bus.set_id(id);
@@ -572,7 +576,9 @@ void setup_master()
  */
 void setup_node()
 {
-  bus.strategy.set_pins(inputPin, outputPin);
+  oneWire ? bus.strategy.set_pin(inputPin) :
+            bus.strategy.set_pins(inputPin, outputPin);
+ 
   bus.set_receiver(receiver_function_node);
   bus.begin();
   bus.set_id(id);

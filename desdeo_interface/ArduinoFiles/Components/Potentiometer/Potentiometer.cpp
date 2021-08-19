@@ -31,7 +31,11 @@ float Potentiometer::getValue(ADS1115 adc)
     {
         _lastRead = m;
         analogVal = adc.readADC(_pin);
+
+        //Sandwhich the values. Max and min values not optimal, maybe deadzones. 
+        // Make sure to match the max value in the scaling aswell. hardcoding 5/5
         if (analogVal < 0) analogVal = 0;
+        else if (analogVal > 24208) analogVal = 24208;
     }
 
     //analogVal = filter(analogVal);
@@ -73,7 +77,7 @@ uint16_t Potentiometer::filter(uint16_t value)
 float Potentiometer::scale(float value, float min, float max) 
 {
     if (max <= min) return value;
-    return min + (value / 32768)*(max-min);
+    return min + (value / 24208)*(max-min);
 }
 
 /*

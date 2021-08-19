@@ -3,6 +3,7 @@ This module is intended to be used with the [web interface](https://github.com/g
 
 You could make this an own package but for now/simplicity:
 * copy physical_interface folder to react projects src folder, or whatever folder you're using
+* copy the images from images folder to public folder
 * import Interface to ReferencePointMethod.tsx 
 * Create the PhysicalInterface component.
     * I'd suggest adding it to the end of the page
@@ -13,7 +14,6 @@ You could make this an own package but for now/simplicity:
 * The module assumes that important action buttons such as set/iterate and input fields have an id
     * Objective input field ids should match the objective names of the activeProblemInfo.
     * buttons/toggles ids can be adjusted but make sure they match the ids in the Interface.js file
-        * 
         ```
         let iterateB = document.getElementById("iterate");
         let setB = document.getElementById("set");

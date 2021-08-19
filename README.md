@@ -43,7 +43,7 @@ In addition to direction pins each node also needs 2 digital pins (ATmega32u4 su
     * Instead of outlining just the one that disconnected, outline each one that might of disconnected as well
     because of the disconnection
     * i.e. 3 nodes side by side => master - node 1 - node 2. Say node 1 disconnected then also node 2 disconnects...
-* Make it pretty
+* Make it prettier
 * Add crc check
 
 ### Arduino side
@@ -54,3 +54,12 @@ In addition to direction pins each node also needs 2 digital pins (ATmega32u4 su
 * ADS seems to cause some issues sometimes as getting values takes too long and the node misses receiving data
 * Same issue with interrupts so I removed interrupts, you might want to include that again, not sure
     * i.e. Constantly changing rot values will call interrupt function over and over again -> not receiving/sending data.
+* Strings to char arrays or something else
+* Try to save some memory?
+
+### PCB
+Some or actually quite many solders are weak on these prototype pcbs, maybe make them better.
+Problems with pcb in image:
+![pcbProblems](doc\Schematics\pcb_v1_problems.png)
+
+

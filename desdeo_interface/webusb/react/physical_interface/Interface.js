@@ -10,18 +10,18 @@ import Device from "./Device";
 
 // probleminfo : activeprobleminfo
 function PhysicalInterface(probleminfo) {
-  let nodeSize = 60 * 4.5;
+  let nodeSize = 60 * 5.5;
 
   // gets the data from the device every interval. setinterval
   let looper = undefined;
 
   // Html elements from the method view. A physical button press can be easily be bound to simulate a button element click.
-  // This should not be the final way of accomplishing this. 
+  // This should not be the final way of accomplishing this.
   let iterateB = document.getElementById("iterate");
   let setB = document.getElementById("set");
   let satisfiedSwitch = document.getElementById("satisfied-switch");
   let stopB = document.getElementById("stop");
-  
+
   const [inputs, setInputs] = useState({}); // Objective input fields. I've set each input an id that matches the objective name.
   const [device, setDevice] = useState(new Device()); // The device connected to usb
   const [connected, setConnected] = useState(false); // Is the device connected
@@ -30,7 +30,6 @@ function PhysicalInterface(probleminfo) {
   const [nodes, setNodes] = useState([]); // All the nodes in the configuration. List of object, initially was just an object which was nicer but some react state issues which i didn't feel like handling
   const [newConnection, setNewConnection] = useState(false); // Has a new node connected
   const [data, setData] = useState(""); // Latest data from the device/serial
-
 
   /**
    *  Set a nodes component bounds
@@ -52,27 +51,25 @@ function PhysicalInterface(probleminfo) {
       : sendBounds(nid, ctype, cid, problem.nadir[i], problem.ideal[i]);
   };
 
-
   // Get the input fields when component has mounted
   useEffect(() => {
     let inps = {};
-    probleminfo.problem.objectiveNames.map(objName => inps[objName] = document.getElementById(objName));
+    probleminfo.problem.objectiveNames.map(
+      (objName) => (inps[objName] = document.getElementById(objName))
+    );
     console.log(inps);
     setInputs(inps);
-  },[])
-
+  }, []);
 
   // Handle new data when data state changes
   useEffect(() => {
     handleData();
   }, [data]);
 
-
   const connect = async () => {
     let success = await device.connect();
     setConnected(success);
   };
-
 
   const disconnect = async () => {
     device.disconnect();
@@ -91,7 +88,7 @@ function PhysicalInterface(probleminfo) {
       const ser = await device.read();
       console.log(ser);
       if (ser !== undefined) {
-          console.log("setting data")
+        console.log("setting data");
         setData(ser);
       }
     } catch (e) {
@@ -99,7 +96,6 @@ function PhysicalInterface(probleminfo) {
       disconnect();
     }
   };
-
 
   /**
    * Reset the states and clear the looper
@@ -113,7 +109,6 @@ function PhysicalInterface(probleminfo) {
       looper = undefined;
     }
   };
-
 
   /**
    * Handles new data
@@ -150,7 +145,6 @@ function PhysicalInterface(probleminfo) {
     }
   };
 
-
   /**
    * Start the configuration and the looper
    */
@@ -162,7 +156,6 @@ function PhysicalInterface(probleminfo) {
     device.send("S");
   };
 
-
   /**
    * Stop using the physical interface. Device is still connected
    */
@@ -172,7 +165,6 @@ function PhysicalInterface(probleminfo) {
     device.send("Q");
     resetState();
   };
-
 
   /**
    * Start the configuration and the looper
@@ -194,18 +186,31 @@ function PhysicalInterface(probleminfo) {
     return values;
   };
 
-
   /**
    * Get the components of a node with the type
+   * Could be improved a lot
    * @param {type} Nodes type
    */
   const getComps = (type) => {
-    if (type == 0) return [];
+    if (type === 0) return [];
     else if (type === 1) return { B: { 0: { value: 0, role: "undefined" } } };
     else if (type === 2) return { P: { 0: { value: 0, role: "undefined" } } };
     else if (type === 3)
       return {
         B: { 0: { value: 0, role: "undefined" } },
+        R: { 0: { value: 0, role: "undefined" } },
+      };
+    else if (type === 4)
+      return {
+        B: { 0: { value: 0, role: "undefined" } },
+        P: { 0: { value: 0, role: "undefined" } },
+      };
+    else if (type === 5)
+      return {
+        B: {
+          0: { value: 0, role: "undefined" },
+          1: { value: 0, role: "undefined" },
+        },
         R: { 0: { value: 0, role: "undefined" } },
       };
   };
@@ -249,7 +254,6 @@ function PhysicalInterface(probleminfo) {
     }
   };
 
-
   /**
    * Handles a connection packet
    */
@@ -260,12 +264,12 @@ function PhysicalInterface(probleminfo) {
 
   /**
    * Sends bounds packet to the device
-   * @param {nid} node id 
-   * @param {ctype} component type 
-   * @param {cid} component id 
+   * @param {nid} node id
+   * @param {ctype} component type
+   * @param {cid} component id
    * @param {min} minimum bound
    * @param {max} maximum bound
-   * @param {step} step size for rotary encoders 
+   * @param {step} step size for rotary encoders
    */
   const sendBounds = (nid, ctype, cid, min, max, step = 0) => {
     step = step === 0 ? Math.abs((max - min) / 75) : (step = step);
@@ -273,7 +277,6 @@ function PhysicalInterface(probleminfo) {
     console.log(s);
     device.send(s);
   };
-
 
   /**
    * Handles a new node by adding it to the nodes state
@@ -301,8 +304,6 @@ function PhysicalInterface(probleminfo) {
     console.log(nodes);
   };
 
-
-  
   /**
    * Converts a direction number to a position object
    * @param {dir} direction, should be between 0-3
@@ -316,7 +317,6 @@ function PhysicalInterface(probleminfo) {
     return undefined;
   };
 
-
   /**
    * Calculates a nodes position based on the position string
    * @param {s} datastring
@@ -324,29 +324,27 @@ function PhysicalInterface(probleminfo) {
   const calculatePosition = (s) => {
     if (s[0] == "-") return { x: 0, y: 0 }; // Master
 
-    let node = findNodeByPosString(s.slice(0, -1)) // Node that found this node
+    let node = findNodeByPosString(s.slice(0, -1)); // Node that found this node
     let p = Object.assign({}, node.pos); // Copy node pos object
-  
+
     let dir = convertToDir(s.slice(-1)); // Get direction of last movement
-    console.log(dir)
+    console.log(dir);
     p.y += dir.y * (node.isLong && dir.y == -1 ? 1.5 : 1);
     p.x += dir.x;
-  
+
     return p;
   };
 
-
-   /**
+  /**
    * Determines whether a node is long by its type
    * currently only potentiometer nodes are long
    * @param {type} node type
    */
   const isLong = (type) => {
-    return type === 2;
+    return type === 2 || type === 4;
   };
 
-  
-   /**
+  /**
    * Find a node from nodes based on its position
    * @param {pos} nodes position
    */
@@ -369,8 +367,7 @@ function PhysicalInterface(probleminfo) {
     for (var i = 1; i < nodes.length; i++)
       if (ps === nodes[i].posString) return nodes[i];
     return undefined;
-  }
-
+  };
 
   /**
    * Re run the configuration. i.e if a new node connects and dm decides so
@@ -381,8 +378,7 @@ function PhysicalInterface(probleminfo) {
     start();
   };
 
-
-   /**
+  /**
    * Sets the updated component values to actual elements
    * @param {id} node id
    * @param {ct} component type
@@ -397,33 +393,27 @@ function PhysicalInterface(probleminfo) {
     if (role in inputs) {
       inputs[role].value = val;
       setB.click();
-
     } else if (role === "iterate") {
       if (val === 1) iterateB.click();
-    }
-    
-    else if (role === "confirm") {
+    } else if (role === "confirm") {
       if (val === 1) {
-        if (satisfiedSwitch === null || satisfiedSwitch === undefined) return; 
+        if (satisfiedSwitch === null || satisfiedSwitch === undefined) return;
         satisfiedSwitch.click();
         setTimeout(() => {
           stopB = document.getElementById("stop");
-          if (stopB === null || stopB === undefined) return; 
+          if (stopB === null || stopB === undefined) return;
           stopB.click();
         }, 1000);
       }
-    }
-    
-    else if (role === "scroll solutions") {
+    } else if (role === "scroll solutions") {
       const tabs = document.getElementsByClassName("list-group-item-action");
       if (tabs.length > 0) {
-        if (tabs[val]  === null || tabs[val]  === undefined) return;
+        if (tabs[val] === null || tabs[val] === undefined) return;
         tabs[val].click();
         console.log("scroll");
       }
     }
   };
-
 
   /**
    * Get the width and height of the node container
@@ -469,10 +459,10 @@ function PhysicalInterface(probleminfo) {
         </div>
       )}
       <div // Match the size of the nodes
-        style={{ 
+        style={{
           //border: "2px black solid",
           margin: "25px auto 25px",
-          width: range.x * nodeSize + "px", 
+          width: range.x * nodeSize + "px",
           height: range.y * nodeSize + "px",
           position: "relative",
         }}
@@ -506,7 +496,9 @@ function PhysicalInterface(probleminfo) {
             ))
           ))}
       </div>
-      <br/><br/><br/>
+      <br />
+      <br />
+      <br />
     </div>
   );
 }
