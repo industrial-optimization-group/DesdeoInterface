@@ -60,6 +60,6 @@ In addition to direction pins each node also needs 2 digital pins (ATmega32u4 su
 ### PCB
 Some or actually quite many solders are weak on these prototype pcbs, maybe make them better.
 Problems with pcb in image:
-![pcbProblems](doc\Schematics\pcb_v1_problems.png)
+![pcbProblems](doc/Schematics/pcb_v1_problems.png)
 
 
