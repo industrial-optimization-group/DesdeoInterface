@@ -304,7 +304,7 @@ void setBounds(BoundsData b)
 void setADS()
 {
   ADS.begin();
-  ADS.setGain(0);     // ±4.096V
+  ADS.setGain(0);     // ±6.096V
   ADS.setDataRate(4); // 4 Default, 0 slowest, 7 fastest
 }
 
