@@ -8,7 +8,10 @@ A nodes type can be changed at any point with the 'F' Serial command which takes
 | 0             | Empty                | Has nothing             |
 | 1             | Simple button        | Has only a button       |
 | 2             | Simple potentiometer | Has only a potentiometer|
-| 3             | Simple rotary encoder| Has only a rotary encoder, a rotary encoder also has a switch builtin so a simple rotary encoder is a rotary encoder + button|
+| 3             | Simple rotary encoder| Has only a rotary encoder, a rotary encoder also has a switch builtin |
+| 4             | Potentiometer + Button | Has a potentiometer and a button |
+| 5             | rotary encoder + Button | Has a rotary encoder and a button |
+
 
 
 This is needed because we are using the same code for each node => To avoid sending readings of floating pins etc we tell each node

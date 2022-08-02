@@ -28,7 +28,7 @@ void Led::setColor(uint8_t rgb[3])
     for (int i = 0; i < 3; ++i)
     {
         _rgb[i] = rgb[i];
-        digitalWrite(_pins[i], _rgb[i]);
+        analogWrite(_pins[i], _rgb[i]);
     }
 }
 

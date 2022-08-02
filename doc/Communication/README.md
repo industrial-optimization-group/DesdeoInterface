@@ -47,17 +47,18 @@ All lines written to serial should be of form "ID dataString CRC", expect those 
 
 | ID            | Explanation         | Direction  | dataString         |
 | ------------- | -------------       | -----      | -----              |
-| F             | Configure node      | M -> S     | type               |
+| F*            | Configure node      | M -> S     | type               |
 | S             | Start configuration | S -> M     | NONE               |
 | O             | Configuration done  | S -> M     | NONE               |
 | Q             | Quit                | S -> M     | NONE               |
 | E             | Reset               | M -> S     | NONE               |
-| N             | Node info           | M -> S     | id:p:r:b           |
+| N             | Node info           | M -> S     | id:type:pos        |
 | C             | Node connected      | M -> S     | NONE               |
 | D             | Node disconnected   | M -> S     | id:dir             |
 | V             | Component value     | M -> S     | nId:type:cId:value |
 | B             | Bounds for node     | M -> S     | nId:compType:compId:minValue:maxValue:stepSize | 
 
+*Not currently implemented but could be beneficial
 
 ### CRC checking
 
