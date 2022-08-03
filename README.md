@@ -57,6 +57,13 @@ In addition to direction pins each node also needs 2 digital pins (ATmega32u4 su
 * Strings to char arrays or something else
 * Try to save some memory?
 
+### Immediate Improvements
+
+* Increase the sampling frequency of the ADC.
+* Change the connectors to 90 degree headers or magnetic pogo pin connectors.
+* PCB revision would be the first step. A stable system will be required for a comprehensive test.
+
+
 ### PCB
 Some or actually quite many solders are weak on these prototype pcbs, maybe make them better.
 Problems with pcb in image:
